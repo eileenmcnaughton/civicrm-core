@@ -407,8 +407,9 @@ class CRM_Member_Page_DashBoard extends CRM_Core_Page {
       );
     }
     //LCD end
-
-    $this->assign('membershipSummary', $membershipSummary);
+    if(CRM_Core_Permission::check('view all contacts')) {
+      $this->assign('membershipSummary', $membershipSummary);
+    }
     $this->assign('totalCount', $totalCount);
     $this->assign('month', date('F', $monthStartTs));
     $this->assign('year', date('Y', $monthStartTs));
