@@ -998,8 +998,8 @@ function _civicrm_api3_basic_create($bao_name, &$params, $entity = NULL) {
     $bao = _civicrm_api3_basic_create_fallback($bao_name, $params);
   }
 
-  if (is_null($bao)) {
-    return civicrm_api3_create_error('Entity not created (' . $fct_name . ')');
+  if (is_null($bao) || is_a($bao, 'CRM_Core_Error')) {
+    throw new API_Exception($bao->getMessages());
   }
   else {
     $values = array();
