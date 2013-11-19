@@ -81,17 +81,72 @@ class CRM_Core_Permission {
   }
 
   /**
-   * given a permission string, check for access requirements
+   * given a permission string or array, check for access requirements
+   * @param mixed $permissions the permission to check as an array or string -see examples
+   *  arrays
+   *  Ex 1 -- (access Civi || access AJAX)
+   *   'getquick' => array(
+   *      array('access CiviCRM', 'access Ajax API'),
+   *    ),
    *
-   * @param string $str the permission to check
+   *  Ex 2 -- (access Civi || access AJAX) && access CiviEvent
+   *   'getquick' => array(
+   *     array('access CiviCRM', 'access Ajax API'),
+   *   'access CiviEvent',
+   * ),
+   *
+   * // Ex 3 -- (access Civi || access AJAX) && (access CiviEvent || access CiviContribute)
+   *  'getquick' => array(
+   *    array('access CiviCRM', 'access Ajax API'),
+   *    array('access CiviEvent', 'access CiviContribute')
+   * ),
+   *
+   *  strings
+   * Ex 1 -- (access Civi || access AJAX)
+   * 'getquick' => array(
+   *  'access CiviCRM || access Ajax API',
+   * ),
+   *
+   *  Ex 2 -- (access Civi || access AJAX) && access CiviEvent
+   *   'getquick' => array(
+   *     'access CiviCRM || access Ajax API',
+   *      'access CiviEvent',
+   *  ),
+   *
+   *  Ex 3 -- (access Civi || access AJAX) && (access CiviEvent || access CiviContribute)
+   *   'getquick' => array(
+   *   'access CiviCRM || access Ajax API',
+   *   'access CiviEvent || CiviContribute',
+   * ),
    *
    * @return boolean true if yes, else false
    * @static
    * @access public
    */
-  static function check($str) {
-    $config = CRM_Core_Config::singleton();
-    return $config->userPermissionClass->check($str);
+  static function check($permissions) {
+    if(is_string($permissions)) {
+      $permissions = explode('||', $permissions);
+    }
+    foreach ($permissions as $permission) {
+      if(is_array($permission) || stristr('||', $permission)) {
+        // this is an 'or' https://gist.github.com/totten/d423b581b57493ced3f5
+        foreach ((array)($permission) as $orPerm) {
+          if(self::check($orPerm)) {
+            //one of our 'or' permissions has succeeded - stop checking this permission
+            return TRUE;;
+          }
+        }
+        //none of our our conditions was met
+        return FALSE;
+      }
+      else {
+        if(!CRM_Core_Config::singleton()->userPermissionClass->check($permission)) {
+          //one of our 'and' conditions has not been met
+          return FALSE;
+        }
+      }
+    }
+    return TRUE;
   }
 
   /**
