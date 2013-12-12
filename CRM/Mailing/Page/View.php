@@ -112,7 +112,10 @@ class CRM_Mailing_Page_View extends CRM_Core_Page {
     $attachments = CRM_Core_BAO_File::getEntityFile('civicrm_mailing',
       $this->_mailing->id
     );
-
+    if (isset($this->_contactID)) {
+      $this->_contactID = 0;
+    }
+    $returnProperties = $this->_mailing->getReturnProperties();
     // get contact detail and compose if contact id exists
     if (isset($this->_contactID)) {
       //get details of contact with token value including Custom Field Token Values.CRM-3734
@@ -140,6 +143,15 @@ class CRM_Mailing_Page_View extends CRM_Core_Page {
 
       $details = $details[0][0];
       $contactId = 0;
+      //get tokens that are not contact specific resolved
+      $params           = array('contact_id' => 0);
+      $details          = CRM_Utils_Token::getAnonymousTokenDetails($params,
+        $returnProperties,
+        TRUE, TRUE, NULL,
+        $this->_mailing->getFlattenedTokens(),
+        get_class($this)
+      );
+      $details = $details[0][0];
     }
     $mime = &$this->_mailing->compose(NULL, NULL, NULL, $contactId,
       $this->_mailing->from_email,
@@ -149,7 +161,7 @@ class CRM_Mailing_Page_View extends CRM_Core_Page {
 
     $title = NULL;
     if (isset($this->_mailing->body_html)) {
-      
+
       $header = 'Content-Type: text/html; charset=utf-8';
       $content = $mime->getHTMLBody();
       if (strpos($content, '<head>') === FALSE && strpos($content, '<title>') === FALSE) {
