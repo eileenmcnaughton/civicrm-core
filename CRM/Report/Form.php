@@ -812,6 +812,13 @@ class CRM_Report_Form extends CRM_Core_Form {
   function getDefaultValues() {
     return $this->_defaults;
   }
+  /**
+   * Getter for $_title
+   * @return string $_title
+   */
+  function getTitle() {
+    return $this->_title;
+  }
 
   function addColumns() {
     $options = array();
