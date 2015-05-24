@@ -1411,14 +1411,6 @@ class CRM_Contribute_Form_Contribution_Main extends CRM_Contribute_Form_Contribu
         $form->_paymentProcessor = array();
       }
 
-      //get payPal express id and make it available to template
-      foreach ($form->_paymentProcessors as $ppId => $values) {
-        $payPalExpressId = ($values['payment_processor_type'] == 'PayPal_Express') ? $values['id'] : 0;
-        $form->assign('payPalExpressId', $payPalExpressId);
-        if ($payPalExpressId) {
-          break;
-        }
-      }
       if (!$form->_snippet) {
         // Add JS to show icons for the accepted credit cards
         $creditCardTypes = CRM_Core_Payment_Form::getCreditCardCSSNames();
