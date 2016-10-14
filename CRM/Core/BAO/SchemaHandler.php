@@ -507,6 +507,28 @@ ADD UNIQUE INDEX `unique_entity_id` ( `entity_id` )";
   }
 
   /**
+   * Get indexes for tables
+   * @param array $tables
+   *   array of table names to find indexes for
+   *
+   * @return array('tableName' => array('index1', 'index2'))
+   */
+  public static function getIndexes($tables) {
+    $indexes = array();
+    foreach ($tables as $table) {
+      $query = "SHOW INDEX FROM $table";
+      $dao = CRM_Core_DAO::executeQuery($query);
+
+      $tableIndexes = array();
+      while ($dao->fetch()) {
+        $tableIndexes[] = $dao->Key_name;
+      }
+      $indexes[$table] = $tableIndexes;
+    }
+    return $indexes;
+  }
+
+  /**
    * Drop an index if one by that name exists.
    *
    * @param string $tableName
