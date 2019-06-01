@@ -9,3 +9,22 @@ SELECT @option_group_id_ps as option_group_id, {localize field='label'}`label`{/
 FROM civicrm_option_value ov
 INNER JOIN civicrm_option_group og
 ON og.id = ov.option_group_id AND og.name = 'contribution_status';
+
+SELECT @maxValue := MAX(value) FROM `civicrm_option_value` where option_group_id = @option_group_id_ps;
+SELECT @maxWeight := MAX(weight) FROM ROM `civicrm_option_value` where option_group_id = @option_group_id_ps;
+
+INSERT INTO `civicrm_option_value` (
+`option_group_id`, {localize field='label'}`label`{/localize}, `value`, `name`, `weight`, `is_reserved`, `is_active`, `is_default`
+)
+VALUES(
+@option_group_id_ps, 'Processing', @maxValue + 1, 'Processing', @maxWeight + 1, 1 , 1 , 0
+)
+ON og.id = ov.option_group_id AND og.name = 'contribution_status';
+
+INSERT INTO `civicrm_option_value` (
+`option_group_id`, {localize field='label'}`label`{/localize}, `value`, `name`, `weight`, `is_reserved`, `is_active`, `is_default`
+)
+VALUES(
+@option_group_id_ps, 'Failing', @maxValue + 2, 'Processing', @maxWeight + 2, 1 , 1 , 0
+)
+ON og.id = ov.option_group_id AND og.name = 'contribution_status';
