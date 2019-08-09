@@ -1748,14 +1748,8 @@ LEFT JOIN  civicrm_country ON (civicrm_address.country_id = civicrm_country.id)
             }
 
             // check whether we have some related memberships still available
-            $query = "
-SELECT count(*)
-  FROM civicrm_membership
-    LEFT JOIN civicrm_membership_status ON (civicrm_membership_status.id = civicrm_membership.status_id)
- WHERE membership_type_id = {$membershipValues['membership_type_id']} AND owner_membership_id = {$membershipValues['owner_membership_id']}
-    AND is_current_member = 1";
-            $result = CRM_Core_DAO::singleValueQuery($query);
-            if ($result < CRM_Utils_Array::value('max_related', $membershipValues, PHP_INT_MAX)) {
+            $isValid = self::isInheritedMembershipValidated($membershipValues);
+            if ($isValid) {
               CRM_Member_BAO_Membership::create($membershipValues);
             }
           }
@@ -2338,5 +2332,25 @@ SELECT relationship_type_id, relationship_direction
       ) && !empty($membershipValues['owner_membership_id']) && !empty($values[$mainRelatedContactId]['memberships'][$membershipValues['owner_membership_id']]);
     return [$relTypeId, $isDeletable];
   }
+
+  /**
+   * Is the inherited relationship validated by this relationship change.
+   *
+   * @param array $membershipValues
+   *
+   * @return bool
+   */
+  private static function isInheritedMembershipValidated($membershipValues) {
+    $query = "
+SELECT count(*)
+  FROM civicrm_membership
+    LEFT JOIN civicrm_membership_status ON (civicrm_membership_status.id = civicrm_membership.status_id)
+ WHERE membership_type_id = {$membershipValues['membership_type_id']} AND owner_membership_id = {$membershipValues['owner_membership_id']}
+    AND is_current_member = 1";
+
+    $result = CRM_Core_DAO::singleValueQuery($query);
+    return $result < CRM_Utils_Array::value('max_related', $membershipValues, PHP_INT_MAX);
+  }
+
 
 }
