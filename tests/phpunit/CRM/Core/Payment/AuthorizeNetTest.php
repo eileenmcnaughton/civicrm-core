@@ -38,13 +38,22 @@ class CRM_Core_Payment_AuthorizeNetTest extends CiviUnitTestCase {
   /**
    * Test doing a one-off payment.
    *
+   * @dataProvider getBooleanDataProvider
+   *
+   * @param bool $usePaymentBag
+   *
    * @throws \Civi\Payment\Exception\PaymentProcessorException
    * @throws \CiviCRM_API3_Exception
    */
-  public function testSinglePayment() {
-    $this->setupMockHandler();
+  public function testSinglePayment($usePaymentBag) {
+    $this->createMockHandler([$this->getExpectedSinglePaymentResponse()]);
+    $this->setUpClientWithHistoryContainer();
+    $this->processor->setGuzzleClient($this->getGuzzleClient());
     $params = $this->getBillingParams();
     $params['amount'] = 5.24;
+    if ($usePaymentBag) {
+      $params = PropertyBag::cast($params);
+    }
     $this->processor->doPayment($params);
     $this->assertEquals($this->getExpectedSinglePaymentRequest(), $this->getRequestBodies()[0]);
   }
@@ -53,10 +62,24 @@ class CRM_Core_Payment_AuthorizeNetTest extends CiviUnitTestCase {
    * Create a single post dated payment as a recurring transaction.
    *
    * Test works but not both due to some form of caching going on in the SmartySingleton
+   *
+   * @dataProvider getBooleanDataProvider
+   *
+   * @param bool $usePaymentBag
+   *
+   * @throws \CRM_Core_Exception
+   * @throws \Civi\Payment\Exception\PaymentProcessorException
    */
+<<<<<<< HEAD
   public function testCreateSingleNowDated() {
     $this->isRecur = TRUE;
     $this->setupMockHandler();
+=======
+  public function testCreateSingleNowDated($usePaymentBag) {
+    $this->createMockHandler([$this->getExpectedResponse()]);
+    $this->setUpClientWithHistoryContainer();
+    $this->processor->setGuzzleClient($this->getGuzzleClient());
+>>>>>>> Add Unit tests for Authorize.net support for PropertyBags
     $firstName = 'John';
     $lastName = "O\'Connor";
     $nameParams = ['first_name' => 'John', 'last_name' => $lastName];
@@ -149,7 +172,9 @@ class CRM_Core_Payment_AuthorizeNetTest extends CiviUnitTestCase {
       'contributionID' => $contribution['id'],
       'contributionRecurID' => $recur['id'],
     ]);
-
+    if ($usePaymentBag) {
+      $params = PropertyBag::cast($params);
+    }
     // turn verifySSL off
     Civi::settings()->set('verifySSL', '0');
     $this->processor->doPayment($params);
@@ -175,10 +200,24 @@ class CRM_Core_Payment_AuthorizeNetTest extends CiviUnitTestCase {
 
   /**
    * Create a single post dated payment as a recurring transaction.
+   *
+   * @dataProvider getBooleanDataProvider
+   *
+   * @param $usePaymentBag
+   *
+   * @throws \CRM_Core_Exception
+   * @throws \Civi\Payment\Exception\PaymentProcessorException
    */
+<<<<<<< HEAD
   public function testCreateSinglePostDated() {
     $this->isRecur = TRUE;
     $this->setupMockHandler();
+=======
+  public function testCreateSinglePostDated($usePaymentBag) {
+    $this->createMockHandler([$this->getExpectedResponse()]);
+    $this->setUpClientWithHistoryContainer();
+    $this->processor->setGuzzleClient($this->getGuzzleClient());
+>>>>>>> Add Unit tests for Authorize.net support for PropertyBags
     $start_date = date('Ymd', strtotime('+ 1 week'));
 
     $firstName = 'John';
@@ -293,7 +332,9 @@ class CRM_Core_Payment_AuthorizeNetTest extends CiviUnitTestCase {
     // to make a successful call for another trxn, we need to set it to something else.
     $smarty = CRM_Core_Smarty::singleton();
     $smarty->assign('subscriptionType', 'create');
-
+    if ($usePaymentBag) {
+      $params = PropertyBag::cast($params);
+    }
     $this->processor->doPayment($params);
 
     // if subscription was successful, processor_id / subscription-id must not be null
@@ -394,8 +435,14 @@ class CRM_Core_Payment_AuthorizeNetTest extends CiviUnitTestCase {
 
   /**
    * Test the update billing function.
+   *
+   * @dataProvider getBooleanDataProvider
+   *
+   * @param bool $usePaymentBag
+   *
+   * @throws \Civi\Payment\Exception\PaymentProcessorException
    */
-  public function testUpdateBilling() {
+  public function testUpdateBilling($usePaymentBag) {
     $this->setUpClient($this->getExpectedUpdateResponse());
     $params = [
       'qfKey' => '52e3078a34158a80b18d0e3c690c5b9f_2369',
@@ -420,6 +467,9 @@ class CRM_Core_Payment_AuthorizeNetTest extends CiviUnitTestCase {
       'amount' => '6.00',
     ];
     $message = '';
+    if ($usePaymentBag) {
+      $params = PropertyBag::cast($params);
+    }
     $result = $this->processor->updateSubscriptionBillingInfo($message, $params);
     $requests = $this->getRequestBodies();
     $this->assertEquals('I00001: Successful.', $message);
@@ -430,9 +480,13 @@ class CRM_Core_Payment_AuthorizeNetTest extends CiviUnitTestCase {
   /**
    * Test change subscription function.
    *
+   * @dataProvider getBooleanDataProvider
+   *
+   * @param bool $usePaymentBag
+   *
    * @throws \Civi\Payment\Exception\PaymentProcessorException
    */
-  public function testChangeSubscription() {
+  public function testChangeSubscription($usePaymentBag) {
     $this->setUpClient($this->getExpectedUpdateResponse());
     $params = [
       'hidden_custom' => '1',
@@ -450,6 +504,9 @@ class CRM_Core_Payment_AuthorizeNetTest extends CiviUnitTestCase {
       'subscriptionId' => 1234,
     ];
     $message = '';
+    if ($usePaymentBag) {
+      $params = PropertyBag::cast($params);
+    }
     $result = $this->processor->changeSubscriptionAmount($message, $params);
     $requests = $this->getRequestBodies();
     $this->assertEquals('I00001: Successful.', $message);
