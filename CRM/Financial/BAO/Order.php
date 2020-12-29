@@ -176,13 +176,21 @@ class CRM_Financial_BAO_Order {
    * @param int $id
    *
    * @return array
-   * @throws \CiviCRM_API3_Exception
    */
   public function getPriceFieldSpec(int $id) :array {
-    if (!isset($this->priceFieldMetadata[$id])) {
+    return $this->getPriceFieldsMetadata()[$id];
+  }
+
+  /**
+   * Get the metadata for the fields in the price set.
+   *
+   * @return array
+   */
+  public function getPriceFieldsMetadata(): array {
+    if (empty($this->priceFieldMetadata)) {
       $this->priceFieldMetadata = CRM_Price_BAO_PriceSet::getCachedPriceSetDetail($this->getPriceSetID())['fields'];
     }
-    return $this->priceFieldMetadata[$id];
+    return $this->priceFieldMetadata;
   }
 
   /**
@@ -193,12 +201,30 @@ class CRM_Financial_BAO_Order {
    *
    * @param array $input
    */
-  public function setPriceSelectionFromUnfilteredInput(array $input) {
+  public function setPriceSelectionFromUnfilteredInput(array $input): void {
     foreach ($input as $fieldName => $value) {
       if (strpos($fieldName, 'price_') === 0) {
         $fieldID = substr($fieldName, 6);
         if (is_numeric($fieldID)) {
           $this->priceSelection[$fieldName] = $value;
+        }
+      }
+    }
+  }
+
+  /**
+   * Set the price field selection for a specific membership type id.
+   *
+   * This would be set when the default membership (quick config)
+   * price set is in play.
+   *
+   * @param int $membershipTypeID
+   */
+  public function setPriceSelectionFromMembershipType(int $membershipTypeID): void {
+    foreach ($this->getPriceFieldsMetadata() as $fieldSpec) {
+      foreach ($fieldSpec['options'] as $option) {
+        if ((int) $option['membership_type_id'] === $membershipTypeID) {
+          $this->priceSelection[$option['price_field_id']] = $option['id'];
         }
       }
     }

@@ -64,6 +64,13 @@ class CRM_Member_Form extends CRM_Contribute_Form_AbstractEditPayment {
   public $_priceSet;
 
   /**
+   * The order being processed.
+   *
+   * @var \CRM_Financial_BAO_Order
+   */
+  protected $order;
+
+  /**
    * Explicitly declare the entity api name.
    */
   public function getDefaultEntity() {
@@ -453,7 +460,16 @@ class CRM_Member_Form extends CRM_Contribute_Form_AbstractEditPayment {
    * @return array
    */
   protected function setPriceSetParameters(array $formValues): array {
-    $this->_priceSetId = $this->getPriceSetID($formValues);
+    $this->order = new CRM_Financial_BAO_Order();
+    $this->order->setPriceSelectionFromUnfilteredInput($formValues);
+    $this->order->setPriceSetID($this->getPriceSetID($formValues));
+    if (!empty($formValues['membership_type_id'][1])) {
+      $this->order->setPriceSelectionFromMembershipType((int) $formValues['membership_type_id'][1]);
+    }
+    $this->order->setOverrideTotalAmount($formValues['total_amount']);
+    $this->order->setOverrideFinancialTypeID((int) $formValues['financial_type_id']);
+    // The below will be phased out in favour of the above over time.
+    $this->_priceSetId = $this->order->getPriceSetID();
     $priceSetDetails = $this->getPriceSetDetails($formValues);
     $this->_priceSet = $priceSetDetails[$this->_priceSetId];
     // process price set and get total amount and line items.
@@ -483,16 +499,11 @@ class CRM_Member_Form extends CRM_Contribute_Form_AbstractEditPayment {
    * @throws \CiviCRM_API3_Exception
    */
   protected function getOrderParams(): array {
-    $order = new CRM_Financial_BAO_Order();
-    $order->setPriceSelectionFromUnfilteredInput($this->_params);
-    $order->setPriceSetID($this->getPriceSetID($this->_params));
-    $order->setOverrideTotalAmount($this->_params['total_amount']);
-    $order->setOverrideFinancialTypeID((int) $this->_params['financial_type_id']);
     return [
-      'lineItems' => [$this->_priceSetId => $order->getLineItems()],
+      'lineItems' => [$this->_priceSetId => $this->order->getLineItems()],
       // This is one of those weird & wonderful legacy params we aim to get rid of.
       'processPriceSet' => TRUE,
-      'tax_amount' => $order->getTotalTaxAmount(),
+      'tax_amount' => $this->order->getTotalTaxAmount(),
     ];
   }
 
