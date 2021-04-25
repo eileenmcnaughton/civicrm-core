@@ -1,6 +1,7 @@
 <?php
 namespace Civi\Token;
 
+use Civi\Api4\Contact;
 use Civi\Token\Event\TokenRenderEvent;
 use Civi\Token\Event\TokenValueEvent;
 use Symfony\Component\EventDispatcher\EventSubscriberInterface;
@@ -57,9 +58,13 @@ class TokenCompatSubscriber implements EventSubscriberInterface {
         $params = [
           ['contact_id', '=', $contactId, 0, 0],
         ];
+        $contactResult = (array) Contact::get(FALSE)
+          ->setSelect(array_keys($returnProperties))->addWhere('id', '=', $contactId)
+          ->execute()->first();
         [$contact] = \CRM_Contact_BAO_Query::apiQuery($params, $returnProperties ?? NULL);
         //CRM-4524
         $contact = reset($contact);
+        $diff = array_diff_key($contact, $contactResult);
         // Test cover for greeting in CRM_Core_BAO_ActionScheduleTest::testMailer
         $contact['email_greeting'] = $contact['email_greeting_display'] ?? '';
         $contact['postal_greeting'] = $contact['postal_greeting_display'] ?? '';
@@ -105,6 +110,109 @@ class TokenCompatSubscriber implements EventSubscriberInterface {
     }
   }
 
+  public function getExpectedFields() {
+    return [
+      'image_URL',
+      'legal_identifier',
+      'external_identifier',
+      'contact_type',
+      'contact_sub_type',
+      'sort_name',
+      'display_name',
+      'preferred_mail_format' => 1,
+      'nick_name' => 1,
+      'first_name' => 1,
+      'middle_name' => 1,
+      'last_name' => 1,
+      'prefix_id' => 1,
+      'suffix_id' => 1,
+      'formal_title' => 1,
+      'communication_style_id' => 1,
+      'birth_date' => 1,
+      'gender_id' => 1,
+      'street_address' => 1,
+      'supplemental_address_1' => 1,
+      'supplemental_address_2' => 1,
+      'supplemental_address_3' => 1,
+      'city' => 1,
+      'postal_code' => 1,
+      'postal_code_suffix' => 1,
+      'state_province' => 1,
+      'country' => 1,
+      'world_region' => 1,
+      'geo_code_1' => 1,
+      'geo_code_2' => 1,
+      'email' => 1,
+      'on_hold' => 1,
+      'phone' => 1,
+      'im' => 1,
+      'household_name' => 1,
+      'organization_name' => 1,
+      'deceased_date' => 1,
+      'is_deceased' => 1,
+      'job_title' => 1,
+      'legal_name' => 1,
+      'sic_code' => 1,
+      'current_employer' => 1,
+      'do_not_email' => 1,
+      'do_not_mail' => 1,
+      'do_not_sms' => 1,
+      'do_not_phone' => 1,
+      'do_not_trade' => 1,
+      'is_opt_out' => 1,
+      'contact_is_deleted' => 1,
+      'preferred_communication_method' => 1,
+      'preferred_language' => 1,
+      'address_id' => 1,
+      'address_name' => 1,
+      'addressee' => 1,
+      'checksum' => 1,
+      'communication_style' => 1,
+      'contact_id' => 1,
+      'source',
+      'county',
+      'created_date',
+      'current_employer_id',
+      'custom_1' => 1,
+      'custom_10' => 1,
+      'custom_11' => 1,
+      'custom_12' => 1,
+      'custom_13' => 1,
+      'custom_2' => 1,
+      'custom_3' => 1,
+      'custom_4' => 1,
+      'custom_5' => 1,
+      'custom_7' => 1,
+      'custom_8' => 1,
+      'custom_9' => 1,
+      'email_greeting',
+      'postal_greeting',
+      'gender' => 1,
+      'hash' => 1,
+      'im_provider' => 1,
+      'individual_prefix' => 1,
+      'individual_suffix' => 1,
+      'location_type' => 1,
+      'manual_geo_code' => 1,
+      'master_id' => 1,
+      'modified_date' => 1,
+      'openid' => 1,
+      'phone_ext' => 1,
+      'phone_type' => 1,
+      'phone_type_id' => 1,
+      // email
+      'signature_html' => 1,
+      'signature_text' => 1,
+      // Address
+      'street_name' => 1,
+      'street_number' => 1,
+      'street_number_suffix' => 1,
+      'street_unit' => 1,
+      // website
+      'home_URL',
+      'url',
+    ];
+  }
   /**
    * Apply the various CRM_Utils_Token helpers.
    *
