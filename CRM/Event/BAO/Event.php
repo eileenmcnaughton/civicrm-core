@@ -2089,7 +2089,7 @@ WHERE  ce.loc_block_id = $locBlockId";
             // use case: allow "view all events" but NOT "edit all events"
             // so for a normal site allow users with these two permissions to view all events AND
             // at the same time also allow any hook to override if needed.
-            if (in_array($eventId, CRM_ACL_API::group(CRM_Core_Permission::VIEW, NULL, 'civicrm_event', $allEvents, array_keys($allEvents)))) {
+            if (in_array($eventId, CRM_ACL_BAO_ACL::group(CRM_Core_Permission::VIEW, (int) CRM_Core_Session::getLoggedInContactID(), 'civicrm_event', $allEvents, array_keys($allEvents)))) {
               Civi::$statics[__CLASS__]['permission']['view'][$eventId] = TRUE;
             }
           }
