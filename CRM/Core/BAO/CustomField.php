@@ -1069,7 +1069,7 @@ class CRM_Core_BAO_CustomField extends CRM_Core_DAO_CustomField {
       case 'Autocomplete-Select':
       case 'Radio':
       case 'CheckBox':
-        if ($field['data_type'] == 'ContactReference' && (is_array($value) || is_numeric($value))) {
+        if ($field['data_type'] == 'ContactReference' && (is_array($value) || is_numeric($value)) && !empty($value)) {
           $displayNames = [];
           foreach ((array) $value as $contactId) {
             $displayNames[] = CRM_Core_DAO::getFieldValue('CRM_Contact_DAO_Contact', $contactId, 'display_name');
