@@ -307,25 +307,34 @@ class CRM_Contact_Import_Parser_ContactTest extends CiviUnitTestCase {
   }
 
   /**
-   * Test updating an existing contact with external_identifier match but subtype mismatch.
+   * Test updating an existing contact with external_identifier match but contactType mismatch.
    *
    * @throws \Exception
    */
   public function testImportParserWithUpdateWithTypeMismatch(): void {
     $contactID = $this->organizationCreate(['external_identifier' => 'billy']);
+
+    //Try importing a contact of type "Individual"
+    //Match on external_identifier mismatch on type
     $this->runImport([
       'external_identifier' => 'billy',
       'nick_name' => 'Old Bill',
     ], CRM_Import_Parser::DUPLICATE_UPDATE, FALSE);
+
+    //Make sure it didn't update.
     $contact = $this->callAPISuccessGetSingle('Contact', ['id' => $contactID]);
     $this->assertEquals('', $contact['nick_name']);
     $this->assertEquals('billy', $contact['external_identifier']);
     $this->assertEquals('Organization', $contact['contact_type']);
 
+    //Try importing a contact of type "Individual"
+    //Match on external_identifier mismatch on type
     $this->runImport([
       'id' => $contactID,
       'nick_name' => 'Old Bill',
     ], CRM_Import_Parser::DUPLICATE_UPDATE, FALSE);
+
+    //Make sure it didn't update.
     $contact = $this->callAPISuccessGetSingle('Contact', ['id' => $contactID]);
     $this->assertEquals('', $contact['nick_name']);
     $this->assertEquals('billy', $contact['external_identifier']);
@@ -1049,11 +1058,9 @@ class CRM_Contact_Import_Parser_ContactTest extends CiviUnitTestCase {
    * @throws \API_Exception
    * @throws \CRM_Core_Exception
    */
-  public function testImport($csv, $mapper, $expectedError, $expectedOutcomes = [], $contactType = NULL): void {
+  public function testImport2($csv, $mapper, $expectedError, $expectedOutcomes = [], $submittedValues = []): void {
     try {
-      $this->importCSV($csv, $mapper, [
-        'contactType' => $contactType ?? CRM_Import_Parser::CONTACT_INDIVIDUAL,
-      ]);
+      $this->importCSV($csv, $mapper, $submittedValues);
     }
     catch (CRM_Core_Exception $e) {
       $this->assertSame($expectedError, $e->getMessage());
@@ -1081,6 +1088,7 @@ class CRM_Contact_Import_Parser_ContactTest extends CiviUnitTestCase {
         'expected_error' => '',
         'expected_outcomes' => [CRM_Import_Parser::ERROR => 1],
       ],
+      //Record duplicates multiple contacts
       'organization_multiple_duplicates_invalid' => [
         'csv' => 'organization_multiple_duplicates_invalid.csv',
         'mapper' => [['organization_name'], ['email']],
@@ -1089,7 +1097,19 @@ class CRM_Contact_Import_Parser_ContactTest extends CiviUnitTestCase {
           CRM_Import_Parser::VALID => 2,
           CRM_Import_Parser::ERROR => 1,
         ],
-        'contact_type' => CRM_Import_Parser::CONTACT_ORGANIZATION,
+        'submitted_values' => [
+          'contactType' => CRM_Import_Parser::CONTACT_ORGANIZATION,
+        ],
+      ],
+      //Matching this contact based on the de-dupe rule would cause an external ID conflict
+      'individual_invalid_external_identifier_email_mismatch' => [
+        'csv' => 'individual_invalid_external_identifier_email_mismatch.csv',
+        'mapper' => [['first_name'], ['last_name'], ['email'], ['external_identifier']],
+        'expected_error' => '',
+        'expected_outcomes' => [
+          CRM_Import_Parser::VALID => 2,
+          CRM_Import_Parser::ERROR => 1,
+        ],
       ],
     ];
   }
