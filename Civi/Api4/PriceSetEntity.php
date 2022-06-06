@@ -1,4 +1,5 @@
-{*
+<?php
+/*
  +--------------------------------------------------------------------+
  | Copyright CiviCRM LLC. All rights reserved.                        |
  |                                                                    |
@@ -6,6 +7,16 @@
  | permitted exceptions and without any warranty. For full license    |
  | and copyright information, see https://civicrm.org/licensing       |
  +--------------------------------------------------------------------+
-*}
-{* Contribution Import Wizard - Data Mapping table used by MapFields.tpl and Preview.tpl *}
-{include file="CRM/Import/Form/MapTableCommon.tpl" mapper=$form.mapper}
+ */
+namespace Civi\Api4;
+
+/**
+ * PriceSetEntity entity.
+ *
+ * @searchable secondary
+ * @since 5.27
+ * @package Civi\Api4
+ */
+class PriceSetEntity extends Generic\DAOEntity {
+
+}

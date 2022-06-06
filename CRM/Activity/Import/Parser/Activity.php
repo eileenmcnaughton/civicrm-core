@@ -156,7 +156,7 @@ class CRM_Activity_Import_Parser_Activity extends CRM_Import_Parser {
     foreach ($params as $key => $val) {
       if ($customFieldID = CRM_Core_BAO_CustomField::getKeyID($key)) {
         if (!empty($customFields[$customFieldID]) && $customFields[$customFieldID]['data_type'] == 'Date') {
-          CRM_Contact_Import_Parser_Contact::formatCustomDate($params, $params, $dateType, $key);
+          $this->formatCustomDate($params, $params, $dateType, $key);
         }
         elseif (!empty($customFields[$customFieldID]) && $customFields[$customFieldID]['data_type'] == 'Boolean') {
           $params[$key] = CRM_Utils_String::strtoboolstr($val);
@@ -369,7 +369,7 @@ class CRM_Activity_Import_Parser_Activity extends CRM_Import_Parser {
    *
    * @throws \CRM_Core_Exception
    */
-  protected function validateValues(array $values): void {
+  public function validateValues(array $values): void {
     // Check required fields if this is not an update.
     if (!$this->getFieldValue($values, 'activity_id')) {
       if (!$this->getFieldValue($values, 'activity_label')

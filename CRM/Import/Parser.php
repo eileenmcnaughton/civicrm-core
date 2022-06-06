@@ -110,6 +110,14 @@ abstract class CRM_Import_Parser {
   private $availableCountries;
 
   /**
+   *
+   * @return array
+   */
+  public function getTrackingFields(): array {
+    return [];
+  }
+
+  /**
    * Get User Job.
    *
    * API call to retrieve the userJob row.
@@ -1278,6 +1286,9 @@ abstract class CRM_Import_Parser {
     if ($fieldMetadata['type'] === CRM_Utils_Type::T_FLOAT) {
       return CRM_Utils_Rule::numeric($importedValue) ? $importedValue : 'invalid_import_value';
     }
+    if ($fieldMetadata['type'] === CRM_Utils_Type::T_MONEY) {
+      return CRM_Utils_Rule::money($importedValue, TRUE) ? CRM_Utils_Rule::cleanMoney($importedValue) : 'invalid_import_value';
+    }
     if ($fieldMetadata['type'] === CRM_Utils_Type::T_BOOLEAN) {
       $value = CRM_Utils_String::strtoboolstr($importedValue);
       if ($value !== FALSE) {
@@ -1285,7 +1296,7 @@ abstract class CRM_Import_Parser {
       }
       return 'invalid_import_value';
     }
-    if ($fieldMetadata['type'] === CRM_Utils_Type::T_DATE) {
+    if ($fieldMetadata['type'] === CRM_Utils_Type::T_DATE || $fieldMetadata['type'] === (CRM_Utils_Type::T_DATE + CRM_Utils_Type::T_TIME) || $fieldMetadata['type'] === CRM_Utils_Type::T_TIMESTAMP) {
       $value = CRM_Utils_Date::formatDate($importedValue, $this->getSubmittedValue('dateFormats'));
       return ($value) ?: 'invalid_import_value';
     }
@@ -1525,6 +1536,21 @@ abstract class CRM_Import_Parser {
   }
 
   /**
+   * Validate the import values.
+   *
+   * The values array represents a row in the datasource.
+   *
+   * @param array $values
+   *
+   * @throws \API_Exception
+   * @throws \CRM_Core_Exception
+   */
+  public function validateValues(array $values): void {
+    $params = $this->getMappedRow($values);
+    $this->validateParams($params);
+  }
+
+  /**
    * Search the value for the string 'invalid_import_value'.
    *
    * If the string is found it indicates the fields was rejected
@@ -1653,6 +1679,52 @@ abstract class CRM_Import_Parser {
   }
 
   /**
+   * Run import.
+   *
+   * @param \CRM_Queue_TaskContext $taskContext
+   *
+   * @param int $userJobID
+   * @param int $limit
+   *
+   * @return bool
+   * @throws \API_Exception
+   * @throws \CRM_Core_Exception
+   */
+  public static function runImport($taskContext, $userJobID, $limit) {
+    $userJob = UserJob::get()->addWhere('id', '=', $userJobID)->addSelect('type_id')->execute()->first();
+    $parserClass = NULL;
+    foreach (CRM_Core_BAO_UserJob::getTypes() as $userJobType) {
+      if ($userJob['type_id'] === $userJobType['id']) {
+        $parserClass = $userJobType['class'];
+      }
+    }
+    $parser = new $parserClass();
+    $parser->setUserJobID($userJobID);
+    // Not sure if we still need to init....
+    $parser->init();
+    $dataSource = $parser->getDataSourceObject();
+    $dataSource->setStatuses(['new']);
+    $dataSource->setLimit($limit);
+
+    while ($row = $dataSource->getRow()) {
+      $values = array_values($row);
+
+      try {
+        $parser->import($parser->getSubmittedValue('onDuplicate'), $values);
+      }
+      catch (CiviCRM_API3_Exception $e) {
+        // When we catch errors here we are not adding to the errors array - mostly
+        // because that will become obsolete once https://github.com/civicrm/civicrm-core/pull/23292
+        // is merged and this will replace it as the main way to handle errors (ie. update the table
+        // and move on).
+        $parser->setImportStatus((int) $values[count($values) - 1], 'ERROR', $e->getMessage());
+      }
+    }
+    $parser->doPostImportActions();
+    return TRUE;
+  }
+
+  /**
    * Check if an error in custom data.
    *
    * @deprecated all of this is duplicated if getTransformedValue is used.
@@ -1734,12 +1806,31 @@ abstract class CRM_Import_Parser {
    * @param string $message
    * @param int|null $entityID
    *   Optional created entity ID
-   *
+   * @param array $additionalFields
+   *  Additional fields to be tracked
    * @throws \API_Exception
    * @throws \CRM_Core_Exception
    */
-  protected function setImportStatus(int $id, string $status, string $message, ?int $entityID = NULL): void {
-    $this->getDataSourceObject()->updateStatus($id, $status, $message, $entityID);
+  protected function setImportStatus(int $id, string $status, string $message, ?int $entityID = NULL, $additionalFields = []): void {
+    $this->getDataSourceObject()->updateStatus($id, $status, $message, $entityID, $additionalFields);
+  }
+
+  /**
+   * Convert any given date string to default date array.
+   *
+   * @param array $params
+   *   Has given date-format.
+   * @param array $formatted
+   *   Store formatted date in this array.
+   * @param int $dateType
+   *   Type of date.
+   * @param string $dateParam
+   *   Index of params.
+   */
+  public static function formatCustomDate(&$params, &$formatted, $dateType, $dateParam) {
+    //fix for CRM-2687
+    CRM_Utils_Date::convertToDefaultDate($params, $dateType, $dateParam);
+    $formatted[$dateParam] = CRM_Utils_Date::processDate($params[$dateParam]);
   }
 
 }
