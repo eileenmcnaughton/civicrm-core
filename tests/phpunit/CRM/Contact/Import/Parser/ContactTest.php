@@ -328,6 +328,7 @@ class CRM_Contact_Import_Parser_ContactTest extends CiviUnitTestCase {
     $this->assertEquals('', $contact['nick_name']);
     $this->assertEquals('billy', $contact['external_identifier']);
     $this->assertEquals('Organization', $contact['contact_type']);
+    
     $this->runImport([
       'id' => $contactID,
       'nick_name' => 'Old Bill',
