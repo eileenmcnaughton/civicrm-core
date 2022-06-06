@@ -1058,7 +1058,7 @@ class CRM_Contact_Import_Parser_ContactTest extends CiviUnitTestCase {
    * @throws \API_Exception
    * @throws \CRM_Core_Exception
    */
-  public function testImport2($csv, $mapper, $expectedError, $expectedOutcomes = [], $submittedValues = []): void {
+  public function testImport($csv, $mapper, $expectedError, $expectedOutcomes = [], $submittedValues = []): void {
     try {
       $this->importCSV($csv, $mapper, $submittedValues);
     }
