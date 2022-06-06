@@ -230,7 +230,6 @@ class CRM_Contact_Import_Parser_Contact extends CRM_Import_Parser {
 
     try {
       $params = $this->getMappedRow($values);
-
       $formatted = [];
       foreach ($params as $key => $value) {
         if ($value !== '') {
