@@ -314,34 +314,24 @@ class CRM_Contact_Import_Parser_ContactTest extends CiviUnitTestCase {
   }
 
   /**
-   * Test updating an existing contact with external_identifier match but contactType mismatch.
+   * Test updating an existing contact with external_identifier match but subtype mismatch.
    *
    * @throws \Exception
    */
   public function testImportParserWithUpdateWithTypeMismatch(): void {
     $contactID = $this->organizationCreate(['external_identifier' => 'billy']);
-
-    //Try importing a contact of type "Individual"
-    //Match on external_identifier mismatch on type
     $this->runImport([
       'external_identifier' => 'billy',
       'nick_name' => 'Old Bill',
     ], CRM_Import_Parser::DUPLICATE_UPDATE, FALSE);
-
-    //Make sure it didn't update.
     $contact = $this->callAPISuccessGetSingle('Contact', ['id' => $contactID]);
     $this->assertEquals('', $contact['nick_name']);
     $this->assertEquals('billy', $contact['external_identifier']);
     $this->assertEquals('Organization', $contact['contact_type']);
-
-    //Try importing a contact of type "Individual"
-    //Match on external_identifier mismatch on type
     $this->runImport([
       'id' => $contactID,
       'nick_name' => 'Old Bill',
     ], CRM_Import_Parser::DUPLICATE_UPDATE, FALSE);
-
-    //Make sure it didn't update.
     $contact = $this->callAPISuccessGetSingle('Contact', ['id' => $contactID]);
     $this->assertEquals('', $contact['nick_name']);
     $this->assertEquals('billy', $contact['external_identifier']);
