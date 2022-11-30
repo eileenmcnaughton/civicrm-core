@@ -246,5 +246,13 @@ function civiimport_civicrm_buildForm(string $formName, $form) {
     $form->assign('downloadErrorRecordsUrl', CRM_Utils_System::url('civicrm/search', '', TRUE, '/display/Import_' . $form->getUserJobID() . '/Import_' . $form->getUserJobID() . '?_status=ERROR', FALSE));
     $form->assign('allRowsUrl', CRM_Utils_System::url('civicrm/search', '', TRUE, '/display/Import_' . $form->getUserJobID() . '/Import_' . $form->getUserJobID(), FALSE));
     $form->assign('importedRowsUrl', CRM_Utils_System::url('civicrm/search', '', TRUE, '/display/Import_' . $form->getUserJobID() . '/Import_' . $form->getUserJobID() . '?_status=IMPORTED', FALSE));
+    $userJobID = $form->getUserJobID();
+    Civi::service('angularjs.loader')
+      ->addModules('importSummary' . $userJobID);
+    CRM_Core_Resources::singleton()->addMarkup('<crm-angular-js modules=\'importSummary' . $userJobID . '\'>
+  <form id="bootstrap-theme">
+    <import-summary-' . $userJobID . '></import-summary-' . $userJobID . '>
+  </form>
+</crm-angular-js>');
   }
 }

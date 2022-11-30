@@ -137,10 +137,7 @@ foreach ($importEntities as $importEntity) {
             'table',
             'table-striped',
           ],
-          'pager' => [
-            'show_count' => TRUE,
-            'expose_limit' => TRUE,
-          ],
+          'pager' => FALSE,
           'sort' => [],
           'columns' => [
             [
