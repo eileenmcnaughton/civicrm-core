@@ -3838,7 +3838,7 @@ INNER JOIN civicrm_activity ON civicrm_activity_contact.activity_id = civicrm_ac
     }
 
     $transaction->commit();
-    \Civi::log()->info("Contribution {$contributionParams['id']} updated successfully");
+    \Civi::log()->info('Contribution {contribution_id} updated successfully', ['contribution_id' => $contributionParams['id']]);
 
     $contributionSoft = ContributionSoft::get(FALSE)
       ->addWhere('contribution_id', '=', $contributionID)
@@ -3854,7 +3854,7 @@ INNER JOIN civicrm_activity ON civicrm_activity_contact.activity_id = civicrm_ac
         'id' => $contributionID,
         'payment_processor_id' => $paymentProcessorId,
       ]);
-      \Civi::log()->info("Contribution {$contributionParams['id']} Receipt sent");
+      \Civi::log()->info('Contribution {contribution_id} Receipt sent', ['contribution_id' => $contributionParams['id']]);
     }
 
     return $contributionResult;
