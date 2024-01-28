@@ -72,17 +72,4 @@ class CRM_Mailing_Page_AJAX {
     CRM_Utils_JSON::output($messages);
   }
 
-  /**
-   * Retrieve contact mailings.
-   */
-  public static function getContactMailings() {
-    $params = CRM_Core_Page_AJAX::defaultSortAndPagerParams();
-    $params += CRM_Core_Page_AJAX::validateParams(['contact_id' => 'Integer']);
-
-    // get the contact mailings
-    $mailings = CRM_Mailing_BAO_Mailing::getContactMailingSelector($params);
-
-    CRM_Utils_JSON::output($mailings);
-  }
-
 }
