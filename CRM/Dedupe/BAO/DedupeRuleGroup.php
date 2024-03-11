@@ -462,9 +462,15 @@ class CRM_Dedupe_BAO_DedupeRuleGroup extends CRM_Dedupe_DAO_DedupeRuleGroup {
     }
     $patternColumn = '/t1.(\w+)/';
     $exclWeightSum = [];
-
+    $calculatedQueries = $tableQueries;
     CRM_Utils_Hook::dupeQuery($this, 'table', $tableQueries);
+    if (empty($tableQueries)) {
+      return;
+    }
 
+
+    $optimizer = new CRM_Dedupe_FinderQueryOptimizer($tableQueries, $this->threshold);
+    $combos = $optimizer->getCombinableQueries();
     while (!empty($tableQueries)) {
       [$isInclusive, $isDie] = self::isQuerySetInclusive($tableQueries, $this->threshold, $exclWeightSum);
 
