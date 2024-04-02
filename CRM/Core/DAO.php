@@ -2713,6 +2713,9 @@ SELECT contact_id
    * @throws \CRM_Core_Exception
    */
   public static function getReferencesToContactTable() {
+    if (isset(\Civi::$statics[__CLASS__]['contact_references'])) {
+      return \Civi::$statics[__CLASS__]['contact_references'];
+    }
     $contactReferences = [];
     $coreReferences = CRM_Core_DAO::getReferencesToTable('civicrm_contact');
     foreach ($coreReferences as $coreReference) {
@@ -2727,6 +2730,7 @@ SELECT contact_id
     }
     self::appendCustomTablesExtendingContacts($contactReferences);
     self::appendCustomContactReferenceFields($contactReferences);
+    \Civi::$statics[__CLASS__]['contact_references'] = $contactReferences;
     return $contactReferences;
   }
 
