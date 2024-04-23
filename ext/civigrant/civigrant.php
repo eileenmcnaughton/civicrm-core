@@ -102,3 +102,8 @@ function civigrant_civicrm_queryObjects(&$queryObjects, $type) {
     // Do we need to do something here?
   }
 }
+
+function civigrant_civicrm_scanClasses(&$classes) {
+  $classes[] = 'CRM_Grant_Import_Parser_Grant';
+
+}
