@@ -94,15 +94,6 @@ class CRM_Core_DAO_AllCoreTables {
   }
 
   /**
-   * Get the declared token classes.
-   * @return string[]
-   *   [table_name => token class]
-   */
-  public static function tokenClasses() {
-    return array_column(self::getEntities(), 'token_class', 'name');
-  }
-
-  /**
    * @return array
    *   List of indices.
    */
@@ -501,6 +492,16 @@ class CRM_Core_DAO_AllCoreTables {
         \Civi\Core\Resolver::singleton()->call($filter, $args);
       }
     }
+  }
+
+  /**
+   * @param string $property
+   *
+   * @return array
+   */
+  public static function getClassesByProperty(string $property): array {
+    $classes = array_column(self::getEntities(), $property, 'name');
+    return $classes;
   }
 
 }

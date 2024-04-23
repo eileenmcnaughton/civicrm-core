@@ -754,7 +754,7 @@ class CRM_Import_Forms extends CRM_Core_Form {
     foreach (CRM_Core_BAO_UserJob::getTypes() as $jobType) {
       if ($jobType['id'] === $this->getUserJob()['job_type']) {
         $className = $jobType['class'];
-        $classObject = new $className();
+        $classObject = new $className($jobType['id']);
         $classObject->setUserJobID($this->getUserJobID());
         return $classObject;
       };

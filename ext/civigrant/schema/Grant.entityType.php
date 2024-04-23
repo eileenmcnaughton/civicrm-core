@@ -6,6 +6,7 @@ return [
   'table' => 'civicrm_grant',
   'class' => 'CRM_Grant_DAO_Grant',
   'token_class' => 'Civi\Token\GenericEntityTokens',
+  'importable' => TRUE,
   'getInfo' => fn() => [
     'title' => E::ts('Grant'),
     'title_plural' => E::ts('Grants'),

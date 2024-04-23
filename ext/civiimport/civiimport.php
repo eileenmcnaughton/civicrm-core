@@ -138,7 +138,7 @@ function _civiimport_civicrm_get_import_tables(): array {
  * @throws \CRM_Core_Exception
  */
 function civiimport_civicrm_alterTemplateFile($formName, $form, $type, &$templateFile): void {
-  if (in_array($formName, civiimport_enabled_forms())) {
+  if (in_array($formName, civiimport_enabled_forms()) || $form instanceof CRM_Import_Form_Generic_MapField) {
     $templateFile = 'CRM/Import/MapField.tpl';
   }
   if ($formName === 'CRM_Queue_Page_Monitor') {
