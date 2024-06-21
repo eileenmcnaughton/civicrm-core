@@ -10,6 +10,7 @@
  +--------------------------------------------------------------------+
  */
 
+use Civi\Api4\SiteToken;
 use Civi\Token\AbstractTokenSubscriber;
 use Civi\Token\TokenRow;
 
@@ -19,6 +20,14 @@ use Civi\Token\TokenRow;
  * Generate "site.*" tokens.
  */
 class CRM_Core_SiteTokens extends AbstractTokenSubscriber {
+
+  /**
+   * Should permissions be checked when loading tokens.
+   *
+   * @var bool
+   */
+  protected $checkPermissions = FALSE;
+
   /**
    * @var string
    *   Token prefix
@@ -41,13 +50,18 @@ class CRM_Core_SiteTokens extends AbstractTokenSubscriber {
 
   public function getSiteTokens(): array {
     $ret = [];
-    $siteTokens = \Civi\Api4\SiteToken::get(TRUE)
-      ->addSelect('name', 'label')
-      ->addWhere('domain_id', '=', 'current_domain')
-      ->addWhere('is_active', '=', TRUE)
-      ->execute();
-    foreach ($siteTokens as $siteToken) {
-      $ret[$siteToken['name']] = $siteToken['label'];
+    try {
+      $siteTokens = SiteToken::get($this->checkPermissions)
+        ->addSelect('name', 'label')
+        ->addWhere('domain_id', '=', 'current_domain')
+        ->addWhere('is_active', '=', TRUE)
+        ->execute();
+      foreach ($siteTokens as $siteToken) {
+        $ret[$siteToken['name']] = $siteToken['label'];
+      }
+    }
+    catch (\Civi\API\Exception\UnauthorizedException $e) {
+      return [];
     }
     return $ret;
   }
@@ -75,30 +89,32 @@ class CRM_Core_SiteTokens extends AbstractTokenSubscriber {
    * @todo - make this non-static & protected. Remove last deprecated fn that calls it.
    */
   private function getSiteTokenValues(?int $domainID = NULL, bool $html = TRUE): array {
-
-    $ret = [];
-    $siteTokens = \Civi\Api4\SiteToken::get(TRUE)
-      ->addSelect('name', 'body_html', 'body_text')
-      ->addWhere('domain_id', '=', ($domainID ?? 'current_domain'))
-      ->execute();
-    foreach ($siteTokens as $siteToken) {
-      $value = '';
-      if ($html) {
-        $value = $siteToken['body_html'];
-      }
-      else {
-        // For text value, use body_text if we can, otherwise fall back to a
-        // sanitized version of body_html.
-        if (!empty($siteToken['body_text'])) {
-          $value = $siteToken['body_text'];
+    $cacheKey = __CLASS__ . 'event_tokens' . $domainID . '_' . CRM_Core_I18n::getLocale() . ($this->checkPermissions ? CRM_Core_Session::getLoggedInContactID() : '');
+    if (!isset(\Civi::$statics[$cacheKey])) {
+      \Civi::$statics[$cacheKey] = [];
+      $siteTokens = SiteToken::get($this->checkPermissions)
+        ->addSelect('name', 'body_html', 'body_text')
+        ->addWhere('domain_id', '=', ($domainID ?? 'current_domain'))
+        ->execute();
+      foreach ($siteTokens as $siteToken) {
+        $value = '';
+        if ($html) {
+          $value = $siteToken['body_html'];
         }
         else {
-          $value = CRM_Utils_String::htmlToText($siteToken['body_text']);
+          // For text value, use body_text if we can, otherwise fall back to a
+          // sanitized version of body_html.
+          if (!empty($siteToken['body_text'])) {
+            $value = $siteToken['body_text'];
+          }
+          else {
+            $value = CRM_Utils_String::htmlToText($siteToken['body_text']);
+          }
         }
+        \Civi::$statics[$cacheKey][$siteToken['name']] = $value;
       }
-      $ret[$siteToken['name']] = $value;
     }
-    return $ret;
+    return \Civi::$statics[$cacheKey];
   }
 
 }
