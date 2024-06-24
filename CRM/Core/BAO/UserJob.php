@@ -212,7 +212,7 @@ class CRM_Core_BAO_UserJob extends CRM_Core_DAO_UserJob implements HookInterface
    * @return array
    */
   public static function getTypes(): array {
-    $types = NULL;//Civi::cache('metadata')->get('UserJobTypes');
+    $types = Civi::cache('metadata')->get('UserJobTypes');
     if ($types === NULL) {
       $types = [];
       $classes = ClassScanner::get(['interface' => UserJobInterface::class]);

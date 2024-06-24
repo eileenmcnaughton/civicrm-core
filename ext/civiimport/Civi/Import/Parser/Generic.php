@@ -40,13 +40,13 @@ class Generic extends \CRM_Import_Parser {
     foreach ($entities as $entity) {
       if (!empty($entity['importable'])) {
         $entityName = \CRM_Utils_String::munge($entity['name']);
-        $name = $entityName . '_import';
+        $name = strtolower($entityName) . '_import';
         $jobInfo[$name ] = [
           'id' => $name,
           'name' => $name,
           'entity' => $entity['name'],
           'label' => E::ts('%1 Import', [1 => $entity['name']]),
-          'url' => 'civicrm/import/' . $entityName,
+          'url' => 'civicrm/import/' . strtolower($entityName),
         ];
       }
 
@@ -60,53 +60,9 @@ class Generic extends \CRM_Import_Parser {
    */
   protected function setFieldMetadata(): void {
     if (empty($this->importableFieldsMetadata)) {
-      $fields = ['' => ['title' => ts('- do not import -')]];
-      $apiv4 = Contribution::getFields(TRUE)->addWhere('custom_field_id', '>', 0)->execute();
-      $customFields = [];
-      foreach ($apiv4 as $apiv4Field) {
-        $customFields[$apiv4Field['name']] = $apiv4Field;
-      }
-      $fields = array_merge($fields, $customFields);
-
-      $fields['soft_credit.contact.id'] = [
-        'title' => ts('Soft Credit Contact ID'),
-        'softCredit' => TRUE,
-        'name' => 'id',
-        'entity' => 'Contact',
-        'entity_instance' => 'SoftCreditContact',
-        'entity_prefix' => 'soft_credit.contact.',
-        'options' => FALSE,
-        'type' => CRM_Utils_Type::T_STRING,
-        'contact_type' => ['Individual' => 'Individual', 'Household' => 'Household', 'Organization' => 'Organization'],
-        'match_rule' => '*',
-      ];
-      foreach ($tmpContactField as $contactField) {
-        $fields['soft_credit.contact.' . $contactField['name']] = array_merge($contactField, [
-          'title' => ts('Soft Credit Contact') . ' ' . $contactField['title'],
-          'softCredit' => TRUE,
-          'entity' => 'Contact',
-          'entity_instance' => 'SoftCreditContact',
-          'entity_prefix' => 'soft_credit.contact.',
-        ]);
-      }
-
-      // add pledge fields only if its is enabled
-      if (CRM_Core_Permission::access('CiviPledge')) {
-        $pledgeFields = [
-          'pledge_id' => [
-            'title' => ts('Pledge ID'),
-            'headerPattern' => '/Pledge ID/i',
-            'name' => 'pledge_id',
-            // This is handled as a contribution field & the goal is
-            // to make it pseudofield on the contribution.
-            'entity' => 'Contribution',
-            'type' => CRM_Utils_Type::T_INT,
-            'options' => FALSE,
-          ],
-        ];
-
-        $fields = array_merge($fields, $pledgeFields);
-      }
+      $jobType = \CRM_Core_BAO_UserJob::getType($this->jobType);
+      $fields = ['' => ['title' => E::ts('- do not import -')]]
+        + $this->getImportFieldsForEntity($jobType['entity']);
       $this->importableFieldsMetadata = $fields;
     }
   }

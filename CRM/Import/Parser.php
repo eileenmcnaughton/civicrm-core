@@ -93,6 +93,12 @@ abstract class CRM_Import_Parser implements UserJobInterface {
    */
   protected $createdContacts = [];
 
+  protected ?string $jobType;
+
+  public function __construct(?string $jobType = NULL){
+    $this->jobType = $jobType;
+  }
+
   /**
    * Set user job ID.
    *

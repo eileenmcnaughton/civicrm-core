@@ -138,7 +138,17 @@ function _civiimport_civicrm_get_import_tables(): array {
  * @throws \CRM_Core_Exception
  */
 function civiimport_civicrm_alterTemplateFile($formName, $form, $type, &$templateFile): void {
-  if ($formName === 'CRM_Contribute_Import_Form_MapField') {
+  // 'CRM_Contribute_Import_Form_MapField' is migrated over & new imports (eg. Grant)
+  // will get the angular version. But, the others are still using apiv3 fieldnames
+  // & might need that fixed up first.
+  $legacyEntityForms = [
+    'CRM_Event_Import_Form_MapField',
+    'CRM_Member_Import_Form_MapField',
+    'CRM_Contact_Import_Form_MapField',
+    'CRM_Activity_Import_Form_MapField',
+    'CRM_Custom_Import_Form_MapField',
+  ];
+  if (!in_array($formName, $legacyEntityForms, TRUE)) {
     $templateFile = 'CRM/Import/MapField.tpl';
   }
   if ($formName === 'CRM_Queue_Page_Monitor') {
