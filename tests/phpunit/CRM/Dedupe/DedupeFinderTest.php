@@ -165,6 +165,36 @@ class CRM_Dedupe_DedupeFinderTest extends CiviUnitTestCase {
   }
 
   /**
+   * Test that the sql works when the query can be optimised to include 2 tables.
+   *
+   * @return void
+   * @throws \CRM_Core_Exception
+   */
+  public function testCrossTableOptimized(): void {
+    $this->createRuleGroup();
+    $fields = [
+      'email' => ['weight' => 8, 'rule_table' => 'civicrm_email'],
+      'first_name' => ['weight' => 3],
+      'last_name' => ['weight' => 1],
+      'street_address' => ['weight' => 5, 'rule_table' => 'civicrm_address'],
+    ];
+    foreach ($fields as $field => $rule) {
+      $this->createTestEntity('DedupeRule', [
+        'dedupe_rule_group_id.name' => 'TestRule',
+        'rule_table' => $rule['rule_table'] ?? 'civicrm_contact',
+        'rule_weight' => $rule['weight'],
+        'rule_field' => $field,
+      ]);
+    }
+    $this->individualCreate(['first_name' => 'Bob', 'last_name' => 'Smith', 'street_address' => '123 Main St']);
+    $this->individualCreate(['first_name' => 'Bob', 'last_name' => 'Smith', 'street_address' => '123 Main St']);
+    $this->individualCreate(['first_name' => 'Bob', 'email' => 'bob@example.org']);
+    $this->individualCreate(['first_name' => 'Bob', 'email' => 'bob@example.org']);
+    $merges = $this->callAPISuccess('Job', 'process_batch_merge', ['rule_group_id' => $this->ids['DedupeRuleGroup']['individual_general']]);
+    $b = 1;
+  }
+
+  /**
    * Test that a rule set to is_reserved = 0 works.
    *
    * There is a different search used dependent on this variable.

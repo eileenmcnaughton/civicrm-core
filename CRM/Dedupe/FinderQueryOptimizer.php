@@ -272,16 +272,6 @@ class CRM_Dedupe_FinderQueryOptimizer {
     return $queries;
   }
 
-  public function getQueryCombinations(): array {
-    $queries = [];
-    foreach ($this->getValidCombinations() as $combination) {
-      foreach ($combination as $key => $query) {
-        $queries[$key] = $this->queries[$key]['query'];
-      }
-    }
-    return $queries;
-  }
-
   /**
    * Get any fields that should be combined.
    *
@@ -331,29 +321,58 @@ class CRM_Dedupe_FinderQueryOptimizer {
     // but should not touch reserved queries.
     if (!$this->isUseReservedQuery() && !$this->lookupParameters) {
       foreach ($this->getCombinableQueries() as $combo) {
-        $comboQueries = ['field' => [], 'criteria' => [], 'weight' => 0, 'table' => '', 'query' => ''];
-        foreach ($combo as $inComboQuery) {
-          $queryDetail = $this->queries[$inComboQuery];
-          $comboQueries['table'] = $queryDetail['table'];
-          $comboQueries['weight'] += $queryDetail['weight'];
-          $comboQueries['field'][] = $queryDetail['field'];
-          $comboQueries['query'] = $queryDetail['query'];
+        $combinableTableQueries = [];
+        $fields = [];
+        $weight = 0;
+
+        // In this first iteration we key the queries by table and collect the criteria to be combined.
+        foreach ($combo as $combinableQuery) {
+          $queryDetail = $this->queries[$combinableQuery];
+          $table = $queryDetail['table'];
+          if (!isset($combinableTableQueries[$table])) {
+            $combinableTableQueries[$table] = ['field' => [], 'criteria' => [], 'weight' => 0, 'table' => $table, 'query' => ''];
+          }
+          $weight += $queryDetail['weight'];
+          $fields[] = $queryDetail['field'];
+          $combinableTableQueries[$table]['query'] = $queryDetail['query'];
           $criteria = [];
           // The part of the query that relates to the field is in double brackets like this.
           // ((t1.first_name IS NOT NULL AND t2.first_name IS NOT NULL AND t1.first_name = t2.first_name AND t1.first_name <> '' AND t2.first_name <> ''))
           preg_match('/\((\(.+?\))\)/m', $queryDetail['query'], $criteria);
-          $comboQueries['criteria'][] = $criteria[1];
-          unset($queries[$inComboQuery]);
+          $combinableTableQueries[$queryDetail['table']]['criteria'][] = $criteria[1];
+          unset($queries[$combinableQuery]);
         }
-        $combinedKey = $comboQueries['table'] . '.' . implode('_', $comboQueries['field']) . '.' . $comboQueries['weight'];
-        $combinedQuery['query'] = preg_replace('/\((\(.+?\))\)/m', implode(' AND ', $comboQueries['criteria']), $comboQueries['query']);
-        $combinedQuery['query'] = preg_replace('/( \d+ weight )/m', ' ' . $comboQueries['weight'] . ' weight ', $combinedQuery['query']);
-        $combinedQuery['weight'] = $comboQueries['weight'];
-        $combinedQuery['key'] = $combinedKey;
-        $queries[$combinedKey] = $combinedQuery;
+
+        // Now we interpolate the criteria into the within table sql for each table.
+        $combinedTableQueries = [];
+        foreach ($combinableTableQueries as $table => $tableQueries) {
+          $combinedTableQuery['table'] = $table;
+          $combinedTableQuery['query'] = preg_replace('/\((\(.+?\))\)/m', '(' . implode(' AND ', $tableQueries['criteria']) . ')', $tableQueries['query']);
+          $combinedTableQueries[$table] = $combinedTableQuery;
+        }
+
+        // Lastly we combine the criteria across the tables, joining together the INNER JOINs.
+        // We have to 'pick a table' for the key since the calling function will do a table check.
+        $table = array_key_first($combinedTableQueries);
+        foreach ($combinedTableQueries as $tableQuery) {
+          $combinedKey = $table . '.' . implode('_', $fields) . '.' . $weight;
+          if (!isset($queries[$combinedKey])) {
+            $queries[$combinedKey]['weight'] = $weight;
+            $queries[$combinedKey]['key'] = $combinedKey;
+            $queries[$combinedKey]['query'] = preg_replace('/( \d+ weight )/m', ' ' . $weight . ' weight ', $tableQuery['query']);
+          }
+          else {
+            // Squeeze the inner join from this table into the existing query.
+            $innerJoinRegex = "/(INNER JOIN\s+[a-z_]+\s+t\d\s+ON\s+\((\(.+?\))\))/m";
+            $matches = [];
+            preg_match($innerJoinRegex, $tableQuery['query'], $matches);
+            $queries[$combinedKey]['query'] = str_replace(')) WHERE', ')) ' . $matches[1] . ' WHERE', $queries[$combinedKey]['query'] );
+          }
+        }
       }
       uasort($queries, [$this, 'sortWeightDescending']);
     }
+
     $tableQueryFormat = [];
     foreach ($queries as $query) {
       $tableQueryFormat[$query['key']] = $query['query'];
