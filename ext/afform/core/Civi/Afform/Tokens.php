@@ -34,8 +34,6 @@ class Tokens extends AutoService implements EventSubscriberInterface {
 
     return [
       'hook_civicrm_alterMailContent' => 'applyCkeditorWorkaround',
-      'hook_civicrm_tokens' => 'hook_civicrm_tokens',
-      'hook_civicrm_tokenValues' => 'hook_civicrm_tokenValues',
       'civi.token.list' => 'listTokens',
       'civi.token.eval' => 'evaluateTokens',
     ];
