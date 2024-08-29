@@ -2,6 +2,10 @@
 
 namespace E2E\AfformMock;
 
+// Using the autoloader running php tests in the IDE is hard - Matt & I realised in
+// Hamburg we both use require_once in all our extensions tests where they use
+// base classes to get around the pain.
+require_once __DIR__ . '/../../../phpunit/Civi/AfformMock/FormTestCase.php';
 use CRM_Core_DAO;
 
 /**
@@ -69,7 +73,7 @@ class MockPublicFormTest extends \Civi\AfformMock\FormTestCase {
   /**
    * The email token `{afform.mockPublicFormUrl}` should evaluate to an authenticated URL.
    */
-  public function testAuthenticatedUrlToken_Plain() {
+  public function testAuthenticatedUrlToken_Plain(): void {
     if (!function_exists('authx_civicrm_config')) {
       $this->fail('Cannot test without authx');
     }
@@ -94,7 +98,7 @@ class MockPublicFormTest extends \Civi\AfformMock\FormTestCase {
   /**
    * The email token `{afform.mockPublicFormUrl}` should evaluate to an authenticated URL.
    */
-  public function testAuthenticatedUrlToken_Html() {
+  public function testAuthenticatedUrlToken_Html(): void {
     if (!function_exists('authx_civicrm_config')) {
       $this->fail('Cannot test without authx');
     }
@@ -106,7 +110,7 @@ class MockPublicFormTest extends \Civi\AfformMock\FormTestCase {
       $this->fail('HTML message did not have URL in expected place: ' . $html);
     }
     $url = html_entity_decode($m[1]);
-    $this->assertMatchesRegularExpression(';^https?:.*civicrm/mock-public-form.*;', $url, "URL should look plausible");
+    $this->assertMatchesRegularExpression(';^https?:.*civicrm/|%2Fmock-public-form.*;', $url, "URL should look plausible");
 
     // Going to this page will cause us to authenticate as the target contact
     $http = $this->createGuzzle(['cookies' => new \GuzzleHttp\Cookie\CookieJar()]);
@@ -119,7 +123,7 @@ class MockPublicFormTest extends \Civi\AfformMock\FormTestCase {
   /**
    * The email token `{afform.mockPublicFormLink}` should evaluate to an authenticated URL.
    */
-  public function testAuthenticatedLinkToken_Html() {
+  public function testAuthenticatedLinkToken_Html(): void {
     if (!function_exists('authx_civicrm_config')) {
       $this->fail('Cannot test without authx');
     }
@@ -130,7 +134,7 @@ class MockPublicFormTest extends \Civi\AfformMock\FormTestCase {
     $this->assertEquals(1, $doc->find('a')->count(), 'Document should have hyperlink');
     foreach ($doc->find('a') as $item) {
       /** @var \DOMElement $item */
-      $this->assertMatchesRegularExpression(';^https?:.*civicrm/mock-public-form.*;', $item->getAttribute('href'));
+      $this->assertMatchesRegularExpression(';^https?:.*civicrm/|%2Fmock-public-form.*;', $item->getAttribute('href'));
       $this->assertEquals('My public form', $item->firstChild->data);
       $url = $item->getAttribute('href');
     }

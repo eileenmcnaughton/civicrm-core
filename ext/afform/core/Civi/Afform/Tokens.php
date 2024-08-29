@@ -34,8 +34,6 @@ class Tokens extends AutoService implements EventSubscriberInterface {
 
     return [
       'hook_civicrm_alterMailContent' => 'applyCkeditorWorkaround',
-      'hook_civicrm_tokens' => 'hook_civicrm_tokens',
-      'hook_civicrm_tokenValues' => 'hook_civicrm_tokenValues',
       'civi.token.list' => 'listTokens',
       'civi.token.eval' => 'evaluateTokens',
     ];
@@ -55,65 +53,16 @@ class Tokens extends AutoService implements EventSubscriberInterface {
     }
   }
 
-  /**
-   * Expose tokens for use in UI.
-   *
-   * @param \Civi\Core\Event\GenericHookEvent $e
-   * @see \CRM_Utils_Hook::tokens()
-   */
-  public static function hook_civicrm_tokens(GenericHookEvent $e) {
-    $tokenForms = static::getTokenForms();
-    foreach ($tokenForms as $tokenName => $afform) {
-      $e->tokens['afform']["afform.{$tokenName}Url"] = E::ts('%1 (URL)', [1 => $afform['title'] ?? $afform['name']]);
-      $e->tokens['afform']["afform.{$tokenName}Link"] = E::ts('%1 (Full Hyperlink)', [1 => $afform['title'] ?? $afform['name']]);
-    }
-  }
-
-  /**
-   * Substitute any tokens of the form `{afform.myFormUrl}` or `{afform.myFormLink}` with actual values.
-   *
-   * @param \Civi\Core\Event\GenericHookEvent $e
-   * @see \CRM_Utils_Hook::tokenValues()
-   */
-  public static function hook_civicrm_tokenValues(GenericHookEvent $e) {
-    try {
-      // Depending on the caller, $tokens['afform'] might be ['fooUrl'] or ['fooUrl'=>1]. Because... why not!
-      $activeAfformTokens = array_merge(array_keys($e->tokens['afform'] ?? []), array_values($e->tokens['afform'] ?? []));
-
-      $tokenForms = static::getTokenForms();
-      foreach ($tokenForms as $formName => $afform) {
-        if (!array_intersect($activeAfformTokens, ["{$formName}Url", "{$formName}Link"])) {
-          continue;
-        }
-
-        if (empty($afform['server_route'])) {
-          continue;
-        }
-
-        if (!is_array($e->contactIDs)) {
-          $url = self::createUrl($afform, $e->contactIDs);
-          $e->details["afform.{$formName}Url"] = $url;
-          $e->details["afform.{$formName}Link"] = sprintf('<a href="%s">%s</a>', htmlentities($url), htmlentities($afform['title'] ?? $afform['name']));
-        }
-        else {
-          foreach ($e->contactIDs as $cid) {
-            $url = self::createUrl($afform, $cid);
-            $e->details[$cid]["afform.{$formName}Url"] = $url;
-            $e->details[$cid]["afform.{$formName}Link"] = sprintf('<a href="%s">%s</a>', htmlentities($url), htmlentities($afform['title'] ?? $afform['name']));
-          }
-        }
-      }
-    }
-    catch (CryptoException $ex) {
-      \Civi::log()->warning(__CLASS__ . ' cannot generate tokens due to a crypto exception.',
-        ['exception' => $ex]);
-    }
-  }
-
   public static function listTokens(\Civi\Token\Event\TokenRegisterEvent $e) {
     // this tokens should be available only in contact context i.e. in Message Templates (add/edit)
     if (!in_array('contactId', $e->getTokenProcessor()->getContextValues('schema')[0])) {
       return;
+    }
+    $tokenForms = static::getTokenForms();
+    foreach ($tokenForms as $tokenName => $afform) {
+      $e->entity('afform')
+        ->register("afform.{$tokenName}Url", E::ts('%1 (URL)', [1 => $afform['title'] ?? $afform['name']]))
+        ->register("afform.{$tokenName}Link", E::ts('%1 (Full Hyperlink)', [1 => $afform['title'] ?? $afform['name']]));
     }
 
     $e->entity('afformSubmission')
@@ -123,10 +72,49 @@ class Tokens extends AutoService implements EventSubscriberInterface {
 
   public static function evaluateTokens(\Civi\Token\Event\TokenValueEvent $e) {
     $messageTokens = $e->getTokenProcessor()->getMessageTokens();
+    if (!empty($messageTokens['afform'])) {
+      try {
+        // Depending on the caller, $tokens['afform'] might be ['fooUrl'] or ['fooUrl'=>1]. Because... why not!
+        $activeAfformTokens = array_merge(array_keys($messageTokens['afform'] ?? []), array_values($messageTokens['afform'] ?? []));
+
+        $tokenForms = static::getTokenForms();
+        foreach ($tokenForms as $formName => $afform) {
+          if (!array_intersect($activeAfformTokens, [
+            "{$formName}Url",
+            "{$formName}Link"
+          ])) {
+            continue;
+          }
+
+          if (empty($afform['server_route'])) {
+            continue;
+          }
+
+          foreach ($e->getRows() as $row) {
+            if (!is_array($e->contactIDs)) {
+              $url = self::createUrl($afform, $e->contactIDs);
+              $row->format('text/plain')->tokens('afform', "{$formName}Url", $url);
+              $row->format('text/html')->tokens('afform', "{$formName}Link", sprintf('<a href="%s">%s</a>', htmlentities($url), htmlentities($afform['title'] ?? $afform['name'])));
+            }
+            else {
+              foreach ($e->contactIDs as $cid) {
+                $url = self::createUrl($afform, $cid);
+                $row->format('text/plain')->tokens('afform', "{$formName}Url", $url);
+                $row->format('text/html')->tokens('afform', "{$formName}Link", sprintf('<a href="%s">%s</a>', htmlentities($url), htmlentities($afform['title'] ?? $afform['name'])));
+              }
+            }
+          }
+        }
+      }
+      catch (CryptoException $ex) {
+        \Civi::log()
+          ->warning(__CLASS__ . ' cannot generate tokens due to a crypto exception.',
+            ['exception' => $ex]);
+      }
+    }
     if (empty($messageTokens['afformSubmission'])) {
       return;
     }
-
     // If these tokens are being used, there will only be a single "row".
     // The relevant context is on the TokenProcessor itself, not the row.
     $context = $e->getTokenProcessor()->context;
