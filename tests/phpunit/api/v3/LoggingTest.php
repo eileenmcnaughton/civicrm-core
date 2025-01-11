@@ -34,6 +34,7 @@ class api_v3_LoggingTest extends CiviUnitTestCase {
    */
   protected function tearDown(): void {
     $this->quickCleanup(['civicrm_email', 'civicrm_address']);
+    $this->quickCleanUpFinancialEntities();
     parent::tearDown();
     Civi::settings()->set('logging_no_trigger_permission', FALSE);
     $this->callAPISuccess('Setting', 'create', ['logging' => FALSE]);
