@@ -26,7 +26,7 @@
           // headers. The latter involves some regex.
           $scope.data.defaults = CRM.vars.crmImportUi.defaults;
           $scope.userJob = CRM.vars.crmImportUi.userJob;
-          $scope.data.showColumnNames = $scope.userJob.metadata.submitted_values.skipColumnHeader;
+          $scope.data.showColumnNames = $scope.userJob.metadata.submitted_values.skipColumnHeader || $scope.userJob.metadata.submitted_values.isFirstRowHeader;
           $scope.data.savedMapping = CRM.vars.crmImportUi.savedMapping;
           $scope.mappingSaving = {updateFieldMapping: 0, newFieldMapping: 0};
           // Used for dedupe rules select options, also for filtering available fields.
