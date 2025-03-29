@@ -435,7 +435,7 @@ class CRM_Contribute_Form_ContributionBase extends CRM_Core_Form {
       $this->assignPaymentProcessor($isPayLater);
       // get price info
       // CRM-5095
-      $this->initSet($this);
+      $this->initSet();
 
       // this avoids getting E_NOTICE errors in php
       $setNullFields = [
@@ -646,25 +646,20 @@ class CRM_Contribute_Form_ContributionBase extends CRM_Core_Form {
   }
 
   /**
-   * Initiate price set such that various non-BAO things are set on the form.
-   *
-   * This function is not really a BAO function so the location is misleading.
-   *
-   * @param CRM_Core_Form $form
-   *   Form entity id.
+   * Initiate price set such that various legacy things are set on the form.
    *
    * @todo - removed unneeded code from previously-shared function
    */
-  private function initSet($form) {
+  private function initSet() {
     $priceSetId = $this->getPriceSetID();
     // get price info
     if ($priceSetId) {
-      if ($form->_action & CRM_Core_Action::UPDATE) {
-        $form->_values['line_items'] = CRM_Price_BAO_LineItem::getLineItems($form->_id, 'contribution');
+      if ($this->_action & CRM_Core_Action::UPDATE) {
+        $this->_values['line_items'] = CRM_Price_BAO_LineItem::getLineItems($this->_id, 'contribution');
       }
-      $form->_priceSet = $this->order->getPriceSetMetadata();
+      $this->_priceSet = $this->order->getPriceSetMetadata();
       $this->setPriceFieldMetaData($this->order->getPriceFieldsMetadata());
-      $form->set('priceSet', $form->_priceSet);
+      $this->set('priceSet', $this->_priceSet);
     }
   }
 
