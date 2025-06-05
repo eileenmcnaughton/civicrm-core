@@ -451,7 +451,7 @@ class CRM_Import_Forms extends CRM_Core_Form {
       'created_id' => CRM_Core_Session::getLoggedInContactID(),
       'job_type' => $this->getUserJobType(),
       'status_id:name' => 'draft',
-      'name' => 'import_' . $this->getMappingName(),
+      'name' => 'import_' . $this->getSubmittedValue('saveMappingName'),
       'metadata' => ['submitted_values' => $this->getSubmittedValues()],
     ])->execute()->first()['id'];
   }
