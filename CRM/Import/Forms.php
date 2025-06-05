@@ -915,15 +915,23 @@ class CRM_Import_Forms extends CRM_Core_Form {
    * @throws \CRM_Core_Exception
    */
   protected function getTemplateJob(): ?array {
-    $mappingName = $this->getMappingName();
-    if (!$mappingName) {
-      return NULL;
+    $templateID = $this->templateID ?? $this->getUserJob()['metadata']['template_id'] ?? NULL;
+
+    if ($templateID) {
+      $templateJob = UserJob::get(FALSE)
+        ->addWhere('id', '=', $templateID)
+        ->addWhere('is_template', '=', TRUE)
+        ->execute()->first();
+      $this->templateID = $templateJob['id'] ?? NULL;
     }
-    $templateJob = UserJob::get(FALSE)
-      ->addWhere('name', '=', 'import_' . $mappingName)
-      ->addWhere('is_template', '=', TRUE)
-      ->execute()->first();
-    $this->templateID = $templateJob['id'] ?? NULL;
+    else {
+      $mappingName = $this->getMappingName();
+      $templateJob = UserJob::get(FALSE)
+        ->addWhere('name', '=', 'import_' . $mappingName)
+        ->addWhere('is_template', '=', TRUE)
+        ->execute()->first();
+      $this->templateID = $templateJob['id'] ?? NULL;
+    }
     return $templateJob ?? NULL;
   }
 
