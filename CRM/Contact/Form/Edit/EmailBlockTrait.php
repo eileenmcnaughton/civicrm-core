@@ -48,7 +48,8 @@ trait CRM_Contact_Form_Edit_EmailBlockTrait {
           ->execute();
       }
       if ($this->getLocationBlockID()) {
-        $this->existingEmails = Email::get()
+        // In this scenario we are looking up the emails for an event or domain & so we do not apply permissions
+        $this->existingEmails = Email::get(FALSE)
           ->addSelect('*', 'custom.*')
           ->addOrderBy('is_primary', 'DESC')
           ->addWhere('id', 'IN', [$this->getLocationBlockValue('email_id'), $this->getLocationBlockValue('email_2_id')])
