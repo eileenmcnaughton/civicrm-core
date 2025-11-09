@@ -76,7 +76,10 @@ class CRM_Financial_BAO_FinancialItem extends CRM_Financial_DAO_FinancialItem {
     }
     else {
       $accountRelName = 'Income Account is';
-      if (property_exists($contribution, 'revenue_recognition_date') && !CRM_Utils_System::isNull($contribution->revenue_recognition_date)) {
+      if (property_exists($contribution, 'revenue_recognition_date')
+        && !CRM_Utils_System::isNull($contribution->revenue_recognition_date)
+        && strtotime($contribution->revenue_recognition_date) > strtotime(date('Y-m-d'))
+      ) {
         $accountRelName = 'Deferred Revenue Account is';
       }
     }
