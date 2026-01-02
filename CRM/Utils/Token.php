@@ -1525,6 +1525,7 @@ class CRM_Utils_Token {
           '$lineItem' => '$lineItems',
           '$billingName' => 'contribution.address_id.name',
           '$address' => 'contribution.address_id.display',
+          '$membership_amount' => ts('no longer available / relevant'),
         ],
         'membership_online_receipt' => [
           '$dataArray' => ts('see default template for how to show this'),
@@ -1542,6 +1543,7 @@ class CRM_Utils_Token {
           '$contributionPageId' => 'contribution.contribution_page_id',
           '$lineItem' => '$lineItems',
           '$billingName' => 'contribution.address_id.name',
+          '$membership_amount' => ts('no longer available / relevant'),
         ],
         'contribution_offline_receipt' => [
           '$totalTaxAmount' => 'contribution.tax_amount',

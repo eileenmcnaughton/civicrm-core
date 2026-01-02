@@ -1753,7 +1753,6 @@ class CRM_Contribute_Form_Contribution_Confirm extends CRM_Contribute_Form_Contr
     }
 
     $this->set('membership_amount', $minimumFee);
-    $this->assign('membership_amount', $minimumFee);
 
     //set this variable as we are not creating pledge for
     //separate membership payment contribution.
