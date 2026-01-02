@@ -52,8 +52,6 @@ class CRM_Contribute_Form_ContributionBase extends CRM_Core_Form {
   /**
    * The values for the contribution db object
    *
-   * @internal - avoid accessing from outside core.
-   *
    * @var array
    *
    * @internal - avoid accessing from outside core.

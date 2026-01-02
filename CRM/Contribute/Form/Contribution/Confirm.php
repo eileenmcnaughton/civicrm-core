@@ -52,15 +52,13 @@ class CRM_Contribute_Form_Contribution_Confirm extends CRM_Contribute_Form_Contr
   /**
    * Previously shared code.
    *
-   * @param $form
    * @param $params
    * @param $contributionParams
    * @param $pledgeID
    * @param $contribution
    * @param $isEmailReceipt
-   * @return mixed
    */
-  private function handlePledge(&$form, $params, $contributionParams, $pledgeID, $contribution, $isEmailReceipt) {
+  private function handlePledge($params, $contributionParams, $pledgeID, $contribution, $isEmailReceipt) {
     if ($pledgeID) {
       //when user doing pledge payments.
       //update the schedule when payment(s) are made
@@ -93,8 +91,7 @@ class CRM_Contribute_Form_Contribution_Confirm extends CRM_Contribute_Form_Contr
       }
 
       //update pledge status according to the new payment statuses
-      CRM_Pledge_BAO_PledgePayment::updatePledgePaymentStatus($pledgeID);
-      return $form;
+      CRM_Pledge_BAO_PledgePayment::updatePledgePaymentStatus($this->getPledgeID());
     }
     else {
       //when user creating pledge record.
@@ -102,7 +99,7 @@ class CRM_Contribute_Form_Contribution_Confirm extends CRM_Contribute_Form_Contr
       $pledgeParams['contact_id'] = $contribution->contact_id;
       $pledgeParams['installment_amount'] = $pledgeParams['actual_amount'] = $contribution->total_amount;
       $pledgeParams['contribution_id'] = $contribution->id;
-      $pledgeParams['contribution_page_id'] = $contribution->contribution_page_id;
+      $pledgeParams['contribution_page_id'] = $this->getContributionPageID();
       $pledgeParams['financial_type_id'] = $contribution->financial_type_id;
       $pledgeParams['frequency_interval'] = $params['pledge_frequency_interval'];
       $pledgeParams['installments'] = $params['pledge_installments'];
@@ -119,9 +116,9 @@ class CRM_Contribute_Form_Contribution_Confirm extends CRM_Contribute_Form_Contr
         $pledgeParams['start_date'] = $pledgeParams['scheduled_date'] = date('Ymd', strtotime($params['start_date']));
       }
       $pledgeParams['status_id'] = $contribution->contribution_status_id;
-      $pledgeParams['max_reminders'] = $form->_values['max_reminders'];
-      $pledgeParams['initial_reminder_day'] = $form->_values['initial_reminder_day'];
-      $pledgeParams['additional_reminder_day'] = $form->_values['additional_reminder_day'];
+      $pledgeParams['max_reminders'] = $this->_values['max_reminders'];
+      $pledgeParams['initial_reminder_day'] = $this->_values['initial_reminder_day'];
+      $pledgeParams['additional_reminder_day'] = $this->_values['additional_reminder_day'];
       $pledgeParams['is_test'] = $contribution->is_test;
       $pledgeParams['acknowledge_date'] = date('Ymd');
       $pledgeParams['original_installment_amount'] = $pledgeParams['installment_amount'];
@@ -137,8 +134,8 @@ class CRM_Contribute_Form_Contribution_Confirm extends CRM_Contribute_Form_Contr
       if ($pledge->id && $isEmailReceipt) {
         //build params to send acknowledgment.
         $pledgeParams['id'] = $pledge->id;
-        $pledgeParams['receipt_from_name'] = $form->_values['receipt_from_name'];
-        $pledgeParams['receipt_from_email'] = $form->_values['receipt_from_email'];
+        $pledgeParams['receipt_from_name'] = $this->_values['receipt_from_name'];
+        $pledgeParams['receipt_from_email'] = $this->_values['receipt_from_email'];
 
         //scheduled amount will be same as installment_amount.
         $pledgeParams['scheduled_amount'] = $pledgeParams['installment_amount'];
@@ -146,10 +143,8 @@ class CRM_Contribute_Form_Contribution_Confirm extends CRM_Contribute_Form_Contr
         //get total pledge amount.
         $pledgeParams['total_pledge_amount'] = $pledge->amount;
 
-        CRM_Pledge_BAO_Pledge::sendAcknowledgment($form, $pledgeParams);
-        return $form;
+        CRM_Pledge_BAO_Pledge::sendAcknowledgment($this, $pledgeParams);
       }
-      return $form;
     }
   }
 
@@ -990,21 +985,13 @@ class CRM_Contribute_Form_Contribution_Confirm extends CRM_Contribute_Form_Contr
     $params,
     $paymentProcessor,
     $contributionParams,
-    $isRecur
+    $isRecur,
+    $isPledge = FALSE
   ) {
     $form = $this;
     $contactID = $contributionParams['contact_id'];
 
     $isEmailReceipt = !empty($form->_values['is_email_receipt']);
-    $isSeparateMembershipPayment = !empty($params['separate_membership_payment']);
-    $pledgeID = $this->getPledgeID();
-    if (!$isSeparateMembershipPayment && !empty($form->_values['pledge_block_id']) &&
-      ($this->getSubmittedValue('is_pledge') || $this->getPledgeID())) {
-      $isPledge = TRUE;
-    }
-    else {
-      $isPledge = FALSE;
-    }
 
     $contributionParams['address_id'] = CRM_Contribute_BAO_Contribution::createAddress($params);
 
@@ -1057,7 +1044,7 @@ class CRM_Contribute_Form_Contribution_Confirm extends CRM_Contribute_Form_Contr
     CRM_Contribute_BAO_ContributionSoft::processSoftContribution($params, $contribution);
 
     if ($isPledge) {
-      $form = $this->handlePledge($form, $params, $contributionParams, $pledgeID, $contribution, $isEmailReceipt);
+      $this->handlePledge($params, $contributionParams, $this->getPledgeID(), $contribution, $isEmailReceipt);
     }
 
     if ($contribution) {
@@ -1756,11 +1743,6 @@ class CRM_Contribute_Form_Contribution_Confirm extends CRM_Contribute_Form_Contr
     $this->set('membership_amount', $minimumFee);
     $this->assign('membership_amount', $minimumFee);
 
-    //set this variable as we are not creating pledge for
-    //separate membership payment contribution.
-    //so for differentiating membership contribution from
-    //main contribution.
-    $this->_params['separate_membership_payment'] = 1;
     $contributionParams = [
       'contact_id' => $contactID,
       'line_item' => [$this->getPriceSetID() => $this->getSecondaryMembershipContributionLineItems()],
@@ -2601,11 +2583,13 @@ class CRM_Contribute_Form_Contribution_Confirm extends CRM_Contribute_Form_Contr
         $contributionParams['payment_instrument_id'] = $paymentParams['payment_instrument_id'] = $form->_paymentProcessor['payment_instrument_id'];
       }
       $transaction = new CRM_Core_Transaction();
+
       $contribution = $this->processFormContribution(
         $paymentParams,
         NULL,
         $contributionParams,
-        $isRecur
+        $isRecur,
+        $this->getSubmittedValue('is_pledge') || $this->getPledgeID()
       );
       $transaction->commit();
       // CRM-13074 - create the CMSUser after the transaction is completed as it
