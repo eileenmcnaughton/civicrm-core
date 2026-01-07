@@ -233,7 +233,7 @@ class CRM_Contribute_Form_Contribution_Confirm extends CRM_Contribute_Form_Contr
     else {
       if ($this->isDeductible($financialTypeID)) {
         if (isset($params['selectProduct'])) {
-          $selectProduct = $params['selectProduct'] ?? NULL;
+          $selectProduct = $this->getSubmittedValue('selectProduct');
         }
         // if there is a product - compare the value to the contribution amount
         if (isset($selectProduct) &&
@@ -829,16 +829,14 @@ class CRM_Contribute_Form_Contribution_Confirm extends CRM_Contribute_Form_Contr
   /**
    * Process the form.
    *
-   * @param array $premiumParams
-   * @param CRM_Contribute_BAO_Contribution $contribution
+   * @param int $contributionID
    */
-  protected function postProcessPremium($premiumParams, $contribution) {
+  protected function postProcessPremium($contributionID): void {
     $hour = $minute = $second = 0;
     // assigning Premium information to receipt tpl
-    $selectProduct = $premiumParams['selectProduct'] ?? NULL;
-    if ($selectProduct &&
-      $selectProduct != 'no_thanks'
-    ) {
+    $selectProduct = $this->getSubmittedValue('selectProduct');
+    $selectedOption = $this->getSubmittedValue('options_' . $selectProduct);
+    if ($selectProduct && $selectProduct !== 'no_thanks') {
       $startDate = $endDate = "";
       $this->assign('selectPremium', TRUE);
       $productDAO = new CRM_Contribute_DAO_Product();
@@ -847,7 +845,7 @@ class CRM_Contribute_Form_Contribution_Confirm extends CRM_Contribute_Form_Contr
       $this->assign('product_name', $productDAO->name);
       $this->assign('price', $productDAO->price);
       $this->assign('sku', $productDAO->sku);
-      $this->assign('option', $premiumParams['options_' . $premiumParams['selectProduct']] ?? NULL);
+      $this->assign('option', $selectedOption);
 
       $periodType = $productDAO->period_type;
 
@@ -906,23 +904,23 @@ class CRM_Contribute_Form_Contribution_Confirm extends CRM_Contribute_Form_Contr
 
       //create Premium record
       $params = [
-        'product_id' => $premiumParams['selectProduct'],
-        'contribution_id' => $contribution->id,
-        'product_option' => $premiumParams['options_' . $premiumParams['selectProduct']] ?? NULL,
+        'product_id' => $selectProduct,
+        'contribution_id' => $contributionID,
+        'product_option' => $selectedOption,
         'quantity' => 1,
         'start_date' => CRM_Utils_Date::customFormat($startDate, '%Y%m%d'),
         'end_date' => CRM_Utils_Date::customFormat($endDate, '%Y%m%d'),
       ];
-      if (!empty($premiumParams['selectProduct'])) {
+      if ($selectProduct) {
         $daoPremiumsProduct = new CRM_Contribute_DAO_PremiumsProduct();
-        $daoPremiumsProduct->product_id = $premiumParams['selectProduct'];
+        $daoPremiumsProduct->product_id = $selectProduct;
         $daoPremiumsProduct->premiums_id = $dao->id;
         $daoPremiumsProduct->find(TRUE);
         $params['financial_type_id'] = $daoPremiumsProduct->financial_type_id;
       }
       //Fixed For CRM-3901
       $daoContrProd = new CRM_Contribute_DAO_ContributionProduct();
-      $daoContrProd->contribution_id = $contribution->id;
+      $daoContrProd->contribution_id = $contributionID;
       if ($daoContrProd->find(TRUE)) {
         $params['id'] = $daoContrProd->id;
       }
@@ -933,7 +931,7 @@ class CRM_Contribute_Form_Contribution_Confirm extends CRM_Contribute_Form_Contr
           'cost' => $productDAO->cost,
           'currency' => $productDAO->currency,
           'financial_type_id' => $params['financial_type_id'],
-          'contributionId' => $contribution->id,
+          'contributionId' => $contributionID,
         ];
         CRM_Core_BAO_FinancialTrxn::createPremiumTrxn($trxnParams);
       }
@@ -941,7 +939,7 @@ class CRM_Contribute_Form_Contribution_Confirm extends CRM_Contribute_Form_Contr
     elseif ($selectProduct === 'no_thanks') {
       //Fixed For CRM-3901
       $daoContrProd = new CRM_Contribute_DAO_ContributionProduct();
-      $daoContrProd->contribution_id = $contribution->id;
+      $daoContrProd->contribution_id = $contributionID;
       if ($daoContrProd->find(TRUE)) {
         $daoContrProd->delete();
       }
@@ -1388,9 +1386,8 @@ class CRM_Contribute_Form_Contribution_Confirm extends CRM_Contribute_Form_Contr
    * @param array $membershipParams
    * @param int $contactID
    * @param array $customFieldsFormatted
-   * @param array $premiumParams
    */
-  protected function processMembership($membershipParams, $contactID, $customFieldsFormatted, $premiumParams): void {
+  protected function processMembership($membershipParams, $contactID, $customFieldsFormatted): void {
 
     $membershipType = $this->getFirstSelectedMembershipType();
 
@@ -1417,7 +1414,7 @@ class CRM_Contribute_Form_Contribution_Confirm extends CRM_Contribute_Form_Contr
       $membershipParams['contribution_source'] = $this->_params['membership_source'];
     }
 
-    $this->postProcessMembership($membershipParams, $contactID, $premiumParams, $customFieldsFormatted, $membershipType, $isPaidMembership, $this->_membershipId, $financialTypeID,);
+    $this->postProcessMembership($membershipParams, $contactID, $customFieldsFormatted, $membershipType, $isPaidMembership, $this->_membershipId, $financialTypeID,);
 
     $this->set('membershipTypeID', $membershipParams['selectMembership']);
   }
@@ -1430,7 +1427,6 @@ class CRM_Contribute_Form_Contribution_Confirm extends CRM_Contribute_Form_Contr
    * @param int $contactID
    *   Contact id.
    *
-   * @param array $premiumParams
    * @param null $customFieldsFormatted
    *
    * @param array $membershipDetails
@@ -1445,7 +1441,7 @@ class CRM_Contribute_Form_Contribution_Confirm extends CRM_Contribute_Form_Contr
    * @throws \Civi\Payment\Exception\PaymentProcessorException
    */
   protected function postProcessMembership(
-    $membershipParams, $contactID, $premiumParams,
+    $membershipParams, $contactID,
     $customFieldsFormatted, $membershipDetails, $isPaidMembership, $membershipID,
     $financialTypeID) {
     $membershipContribution = NULL;
@@ -1484,7 +1480,7 @@ class CRM_Contribute_Form_Contribution_Confirm extends CRM_Contribute_Form_Contr
       );
       if (!empty($paymentResult['contribution'])) {
         $paymentResults[] = ['contribution_id' => $paymentResult['contribution']->id, 'result' => $paymentResult];
-        $this->postProcessPremium($premiumParams, $paymentResult['contribution']);
+        $this->postProcessPremium($paymentResult['contribution']->id);
         //note that this will be over-written if we are using a separate membership transaction. Otherwise there is only one
         $membershipContribution = $paymentResult['contribution'];
         // Save the contribution ID so that I can be used in email receipts
@@ -2044,7 +2040,7 @@ class CRM_Contribute_Form_Contribution_Confirm extends CRM_Contribute_Form_Contr
       $this->_params['payment_processor_id'] = $this->_paymentProcessor['id'];
     }
 
-    $premiumParams = $membershipParams = $params = $this->_params;
+    $membershipParams = $params = $this->_params;
     if (!empty($params['image_URL'])) {
       CRM_Contact_BAO_Contact::processImageParams($params);
     }
@@ -2225,7 +2221,7 @@ class CRM_Contribute_Form_Contribution_Confirm extends CRM_Contribute_Form_Contr
 
     // store the fact that this is a membership and membership type is selected
     if ($this->isMembershipSelected()) {
-      $this->doMembershipProcessing($contactID, $membershipParams, $premiumParams);
+      $this->doMembershipProcessing($contactID, $membershipParams);
     }
     else {
       // at this point we've created a contact and stored its address etc
@@ -2258,7 +2254,7 @@ class CRM_Contribute_Form_Contribution_Confirm extends CRM_Contribute_Form_Contr
 
       if (empty($result['is_payment_failure'])) {
         // @todo move premium processing to complete transaction if it truly is an 'after' action.
-        $this->postProcessPremium($premiumParams, $result['contribution']);
+        $this->postProcessPremium($result['contribution']->id);
       }
       if (!empty($result['contribution'])) {
         // It seems this line is hit when there is a zero dollar transaction & in tests, not sure when else.
@@ -2332,9 +2328,8 @@ class CRM_Contribute_Form_Contribution_Confirm extends CRM_Contribute_Form_Contr
    *
    * @param int $contactID
    * @param array $membershipParams
-   * @param array $premiumParams
    */
-  protected function doMembershipProcessing($contactID, $membershipParams, $premiumParams) {
+  protected function doMembershipProcessing($contactID, $membershipParams) {
     if (!$this->isMembershipPriceSet()) {
       $this->set('membershipTypeID', $this->_params['selectMembership']);
     }
@@ -2399,7 +2394,7 @@ class CRM_Contribute_Form_Contribution_Confirm extends CRM_Contribute_Form_Contr
       // CRM-12233.
       try {
         $membershipParams['amount'] = $this->getMainContributionAmount();
-        $this->processMembership($membershipParams, $contactID, $customFieldsFormatted, $premiumParams);
+        $this->processMembership($membershipParams, $contactID, $customFieldsFormatted);
       }
       catch (\Civi\Payment\Exception\PaymentProcessorException $e) {
         CRM_Core_Session::singleton()->setStatus($e->getMessage());
