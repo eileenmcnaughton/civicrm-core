@@ -1441,7 +1441,7 @@ class CRM_Contribute_Form_Contribution_Confirm extends CRM_Contribute_Form_Contr
       $membershipParams['contribution_source'] = $this->_params['membership_source'];
     }
 
-    $this->postProcessMembership($membershipParams, $contactID, $customFieldsFormatted, $membershipType, $isPaidMembership, $this->_membershipId, $financialTypeID,);
+    $this->postProcessMembership($membershipParams, $contactID, $customFieldsFormatted, $isPaidMembership, $this->_membershipId, $financialTypeID,);
 
     $this->set('membershipTypeID', $membershipParams['selectMembership']);
   }
@@ -1456,8 +1456,6 @@ class CRM_Contribute_Form_Contribution_Confirm extends CRM_Contribute_Form_Contr
    *
    * @param null $customFieldsFormatted
    *
-   * @param array $membershipDetails
-   *
    * @param bool $isPaidMembership
    * @param int $membershipID
    *
@@ -1469,10 +1467,9 @@ class CRM_Contribute_Form_Contribution_Confirm extends CRM_Contribute_Form_Contr
    */
   protected function postProcessMembership(
     $membershipParams, $contactID,
-    $customFieldsFormatted, $membershipDetails, $isPaidMembership, $membershipID,
+    $customFieldsFormatted, $isPaidMembership, $membershipID,
     $financialTypeID) {
     $membershipContribution = NULL;
-    $isTest = $membershipParams['is_test'] ?? FALSE;
     $errors = $paymentResults = [];
 
     $isRecurForFirstTransaction = $this->_params['is_recur'] ?? $membershipParams['is_recur'] ?? NULL;
@@ -1521,8 +1518,7 @@ class CRM_Contribute_Form_Contribution_Confirm extends CRM_Contribute_Form_Contr
         if (empty($this->_params['auto_renew']) && !empty($membershipParams['is_recur'])) {
           unset($membershipParams['is_recur']);
         }
-        [$membershipContribution, $secondPaymentResult] = $this->processSecondaryFinancialTransaction($contactID, array_merge($membershipParams, ['skipLineItem' => 1]),
-          $membershipDetails['minimum_fee'] ?? 0, $membershipDetails['financial_type_id'] ?? NULL);
+        [$membershipContribution, $secondPaymentResult] = $this->processSecondaryFinancialTransaction($contactID, array_merge($membershipParams, ['skipLineItem' => 1]), $this->getFirstSelectedMembershipType()['financial_type_id']);
         $paymentResults[] = ['contribution_id' => $membershipContribution->id, 'result' => $secondPaymentResult];
         $totalAmount = $membershipContribution->total_amount;
         $membershipContributionID = $membershipContribution->id;
@@ -1714,7 +1710,6 @@ class CRM_Contribute_Form_Contribution_Confirm extends CRM_Contribute_Form_Contr
    *
    * @param int $contactID
    * @param array $tempParams
-   * @param $minimumFee
    * @param int $financialTypeID
    *
    * @return array []
@@ -1722,9 +1717,8 @@ class CRM_Contribute_Form_Contribution_Confirm extends CRM_Contribute_Form_Contr
    * @throws \CRM_Core_Exception
    * @throws \Civi\Payment\Exception\PaymentProcessorException
    */
-  private function processSecondaryFinancialTransaction($contactID, $tempParams, $minimumFee,
-                                                   $financialTypeID): array {
-    $tempParams['amount'] = $minimumFee;
+  private function processSecondaryFinancialTransaction($contactID, $tempParams, $financialTypeID): array {
+    $tempParams['amount'] = $this->getFirstSelectedMembershipType()['minimum_fee'] ?? 0;
     $tempParams['invoiceID'] = bin2hex(random_bytes(16));
     $isRecur = $tempParams['is_recur'] ?? NULL;
 
@@ -1736,8 +1730,7 @@ class CRM_Contribute_Form_Contribution_Confirm extends CRM_Contribute_Form_Contr
       $this->set('params', $this->_params);
     }
 
-    $this->set('membership_amount', $minimumFee);
-    $this->assign('membership_amount', $minimumFee);
+    $this->set('membership_amount', $this->getFirstSelectedMembershipType()['minimum_fee'] ?? 0);
 
     //set this variable as we are not creating pledge for
     //separate membership payment contribution.
@@ -1785,7 +1778,7 @@ class CRM_Contribute_Form_Contribution_Confirm extends CRM_Contribute_Form_Contr
     $tempParams['trxn_id'] = $membershipContribution->trxn_id;
     $tempParams['contributionID'] = $membershipContribution->id;
 
-    if ($this->_values['is_monetary'] && !$this->_params['is_pay_later'] && $minimumFee > 0.0) {
+    if ($this->_values['is_monetary'] && !$this->_params['is_pay_later'] && $tempParams['total_amount'] > 0.0) {
       // At the moment our tests are calling this form in a way that leaves 'object' empty. For
       // now we compensate here.
       if (empty($this->_paymentProcessor['object'])) {

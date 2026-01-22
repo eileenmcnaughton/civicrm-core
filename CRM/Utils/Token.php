@@ -1555,6 +1555,7 @@ class CRM_Utils_Token {
           '$sku' => 'contribution_product.product_id.sku',
           '$price' => 'contribution_product.product_id.price|crmMoney',
           '$is_deductible' => 'contribution.non_deductible_amount|boolean',
+          '$membership_amount' => 'contribution.total_amount',
         ],
         'contribution_offline_receipt' => [
           '$totalTaxAmount' => 'contribution.tax_amount',
