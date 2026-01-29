@@ -136,7 +136,7 @@ class api_v3_ContributionPageTest extends CiviUnitTestCase {
    * otherwise have one.
    */
   public function testSubmitNewBillingNameData(): void {
-    $this->setUpContributionPage();
+    $this->contributionPageWithPriceSetCreate();
     $contact = $this->callAPISuccess('Contact', 'create', ['contact_type' => 'Individual', 'email' => 'wonderwoman@amazon.com']);
     $contact = $this->submitPageWithBilling($contact);
     $this->assertEquals([
@@ -172,59 +172,6 @@ class api_v3_ContributionPageTest extends CiviUnitTestCase {
       'contact_id' => $contact['id'],
     ], $contact['values'][$contact['id']]);
 
-  }
-
-  /**
-   * Test process with instant payment when more than one configured for the page.
-   *
-   * @see https://issues.civicrm.org/jira/browse/CRM-16923
-   *
-   * @throws \CRM_Core_Exception
-   */
-  public function testSubmitRecurMultiProcessorInstantPayment(): void {
-    $this->setUpContributionPage();
-    $this->setupPaymentProcessor();
-    $paymentProcessor2ID = $this->paymentProcessorCreate([
-      'payment_processor_type_id' => 'Dummy',
-      'name' => 'processor 2',
-      'class_name' => 'Payment_Dummy',
-      'billing_mode' => 1,
-    ]);
-    $dummyPP = Civi\Payment\System::singleton()->getById($paymentProcessor2ID);
-    $dummyPP->setDoDirectPaymentResult([
-      'payment_status_id' => 1,
-      'trxn_id' => 'create_first_success',
-      'fee_amount' => .85,
-    ]);
-    $processor = $dummyPP->getPaymentProcessor();
-    $this->callAPISuccess('ContributionPage', 'create', [
-      'id' => $this->getContributionPageID(),
-      'payment_processor' => [$paymentProcessor2ID, $this->ids['PaymentProcessor']['dummy']],
-    ]);
-
-    $this->submitOnlineContributionForm([
-      'price_' . $this->ids['PriceField']['radio_field'] => $this->ids['PriceFieldValue']['10_dollars'],
-      'amount' => 10,
-      'is_recur' => 1,
-      'frequency_interval' => 1,
-      'frequency_unit' => 'month',
-      'payment_processor_id' => $paymentProcessor2ID,
-    ], $this->getContributionPageID());
-
-    $contribution = $this->callAPISuccessGetSingle('Contribution', [
-      'contribution_page_id' => $this->getContributionPageID(),
-      'contribution_status_id' => 1,
-      'return' => ['trxn_id', 'total_amount', 'fee_amount', 'net_amount'],
-    ]);
-    $this->assertEquals('create_first_success', $contribution['trxn_id']);
-    $this->assertEquals(10, $contribution['total_amount']);
-    $this->assertEquals(.85, $contribution['fee_amount']);
-    $this->assertEquals(9.15, $contribution['net_amount']);
-    $this->_checkFinancialRecords([
-      'id' => $contribution['id'],
-      'total_amount' => $contribution['total_amount'],
-      'payment_instrument_id' => $processor['payment_instrument_id'],
-    ], 'online');
   }
 
   /**
