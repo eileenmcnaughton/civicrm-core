@@ -42,6 +42,7 @@ function civicrm_api3_participant_create($params) {
   $participantBAO = CRM_Event_BAO_Participant::create($params);
 
   if (empty($params['price_set_id']) && empty($params['id']) && !empty($params['fee_level'])) {
+    CRM_Core_Error::deprecatedWarning('passing fee levels to apiv3 is deprecated, partially valid line items are created - use apiv4 Order api or (if no contribution) Participant api');
     _civicrm_api3_participant_createlineitem($params, $participantBAO);
   }
   _civicrm_api3_object_to_array($participantBAO, $participant[$participantBAO->id]);
