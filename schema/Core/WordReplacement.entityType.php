@@ -65,6 +65,7 @@ return [
       'input_type' => 'Select',
       'add' => '4.4',
       'default' => 'wildcardMatch',
+      'required' => TRUE,
       'pseudoconstant' => [
         'callback' => ['CRM_Core_SelectValues', 'getWordReplacementMatchType'],
       ],
