@@ -743,7 +743,7 @@ class CRM_Core_EntityTokens extends AbstractTokenSubscriber {
         // token for the fk entity's own label field (e.g. `display_name` for
         // Contact) to be the user-facing, api4-style token, and demote the
         // bare token (raw fk id) to sysadmin.
-        $labelField = \Civi\Api4\Utils\CoreUtil::getInfoItem($fkEntity, 'label_field');
+        $labelField = \Civi\Api4\Utils\CoreUtil::getInfoItem($fkEntity, 'label_field') ?? '';
         $labelTokenName = $tokenName . '.' . $labelField;
         if ($labelField && isset($tokensMetadata[$labelTokenName])) {
           $tokensMetadata[$labelTokenName]['title'] = $field['title'];
