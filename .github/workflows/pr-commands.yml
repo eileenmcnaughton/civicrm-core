@@ -163,12 +163,8 @@ jobs:
               UPSTREAM="origin/$base_branch"
             fi
 
-            if [ "$ACTION" = "rebase" ] && git merge-base --is-ancestor origin/$NEW_BASE HEAD; then
-              echo "Branch is already fast-forward mergeable with $NEW_BASE."
-              if [ "$NEW_BASE" != "$base_branch" ]; then
-                echo "Changing PR base branch to $NEW_BASE..."
-                gh pr edit ${{ github.event.issue.number }} --base $NEW_BASE --repo ${{ github.repository }}
-              fi
+            if [ "$ACTION" = "rebase" ] && [ "$NEW_BASE" = "$base_branch" ] && git merge-base --is-ancestor origin/$base_branch HEAD; then
+              echo "Branch is already up to date with $base_branch."
             else
               if ! git rebase --onto origin/$NEW_BASE $UPSTREAM HEAD; then
                 echo "REBASE_FAILED=true" >> $GITHUB_ENV
