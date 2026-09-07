@@ -982,6 +982,86 @@ class CRM_Contribute_Form_Contribution_ConfirmTest extends CiviUnitTestCase {
   }
 
   /**
+   * Test that custom fields on a membership are saved when an existing
+   * membership is renewed (as opposed to a new membership being created).
+   *
+   * https://github.com/civicrm/civicrm-core/pull/36617
+   *
+   * @throws \CRM_Core_Exception
+   */
+  public function testCustomFieldsOnMembershipRenewalGetUpdated(): void {
+    $items = $this->setupMembershipContributionPage();
+    $original_membership = $items['original_membership'];
+
+    $membershipCustomFieldsGroup = $this->createTestEntity('CustomGroup', [
+      'name' => 'MembershipCustomGroup',
+      'title' => 'Custom Fields on Membership',
+      'extends' => 'Membership',
+    ]);
+    $membershipCustomField = $this->createTestEntity('CustomField', [
+      'custom_group_id' => $membershipCustomFieldsGroup['id'],
+      'name' => 'my_membership_custom_field',
+      'label' => 'Membership Custom Field',
+      'data_type' => 'String',
+      'html_type' => 'Text',
+      'is_active' => TRUE,
+      'text_length' => 255,
+    ]);
+
+    $membershipCustomFieldsProfile = $this->createTestEntity('UFGroup', [
+      'is_active' => TRUE,
+      'group_type' => 'Membership,Individual',
+      'title' => 'Membership Custom Fields',
+      'add_captcha' => FALSE,
+      'is_map' => FALSE,
+      'is_edit_link' => FALSE,
+      'is_uf_link' => FALSE,
+      'is_update_dupe' => FALSE,
+    ]);
+    $this->createTestEntity('UFField', [
+      'uf_group_id' => $membershipCustomFieldsProfile['id'],
+      'field_name' => 'custom_' . $membershipCustomField['id'],
+      'name' => 'custom_' . $membershipCustomField['id'],
+      'is_active' => TRUE,
+      'visibility' => 'User and User Admin Only',
+      'in_selector' => FALSE,
+      'is_searchable' => FALSE,
+      'label' => 'custom text field on membership',
+      'field_type' => 'Membership',
+    ]);
+    $this->createTestEntity('UFJoin', [
+      'module' => 'CiviContribute',
+      'weight' => 1,
+      'uf_group_id' => $membershipCustomFieldsProfile['id'],
+      'entity_table' => 'civicrm_contribution_page',
+      'entity_id' => $this->getContributionPageID('existingMemberPage'),
+    ]);
+
+    $this->submitOnlineContributionForm([
+      'contact_id' => $this->ids['Contact']['member'],
+      'payment_processor_id' => $this->ids['PaymentProcessor']['dummy'],
+      'price_' . $this->ids['PriceField']['contribution_amount'] => -1,
+      'price_' . $this->ids['PriceField']['membership_amount'] => $this->ids['PriceFieldValue']['membership_student'],
+      "custom_{$membershipCustomField['id']}" => 'Renewed Value',
+      'credit_card_exp_date' => [
+        'M' => 9,
+        'Y' => (int) (CRM_Utils_Time::date('Y')) + 1,
+      ],
+    ] + $this->getBillingSubmitValues(),
+    $this->getContributionPageID('existingMemberPage'), ['cid' => $this->ids['Contact']['member']]);
+
+    $membership = Membership::get(FALSE)
+      ->addWhere('contact_id', '=', $this->ids['Contact']['member'])
+      ->addSelect('*', 'MembershipCustomGroup.my_membership_custom_field')
+      ->execute()
+      ->first();
+    // Make sure the existing membership was renewed rather than a new one created.
+    $this->assertEquals($original_membership['id'], $membership['id']);
+    $this->assertGreaterThan(strtotime($original_membership['end_date']), strtotime($membership['end_date']));
+    $this->assertEquals('Renewed Value', $membership['MembershipCustomGroup.my_membership_custom_field']);
+  }
+
+  /**
    * Test non-membership donation on a contribution page
    * using membership PriceSet.
    */
