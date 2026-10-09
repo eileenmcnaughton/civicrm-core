@@ -939,11 +939,11 @@ class CRM_Event_Form_Registration extends CRM_Core_Form {
       'id' => $params['participant_id'] ?? NULL,
       'contact_id' => $contactID,
       'event_id' => $this->getEventID(),
-      'status_id' => $params['participant_status'] ?? 1,
+      'status_id' => $this->getParticipantStatusID($participantNumber),
       'role_id' => $this->getRoleID($participantNumber),
       'source' => $this->getSource($participantNumber),
       'fee_level' => $params['amount_level'] ?? NULL,
-      'is_pay_later' => $params['is_pay_later'] ?? 0,
+      'is_pay_later' => $this->getIsPayLaterForParticipant($participantNumber),
       'fee_amount' => $this->getFeeAmountForParticipant($participantNumber),
       'registered_by_id' => $params['registered_by_id'] ?? NULL,
       'fee_currency' => $this->getCurrency(),
@@ -1689,6 +1689,76 @@ class CRM_Event_Form_Registration extends CRM_Core_Form {
   }
 
   /**
+   * Get the status to register a participant with.
+   *
+   * @param int $participantNumber
+   *
+   * @return int
+   * @throws \CRM_Core_Exception
+   */
+  protected function getParticipantStatusID(int $participantNumber): int {
+    return $this->getWaitlistOrApprovalStatusID()
+      ?? $this->getPendingStatusID($participantNumber)
+      ?? 1;
+  }
+
+  /**
+   * Get the status to register a participant with if the event is full
+   * (and has a waitlist) or requires approval - these take priority over
+   * any other status.
+   *
+   * @return int|null
+   */
+  protected function getWaitlistOrApprovalStatusID(): ?int {
+    if ($this->_allowWaitlist) {
+      return CRM_Core_PseudoConstant::getKey('CRM_Event_DAO_Participant', 'status_id', 'On waitlist');
+    }
+    if ($this->_requireApproval) {
+      return CRM_Core_PseudoConstant::getKey('CRM_Event_DAO_Participant', 'status_id', 'Awaiting approval');
+    }
+    return NULL;
+  }
+
+  /**
+   * Get the status to register a participant with if their registration
+   * is paid, has a non-zero fee, and either is pay-later or is otherwise
+   * not resolved to a definite payment outcome within this request (a
+   * noReturn processor, which does not confirm payment synchronously).
+   *
+   * @param int $participantNumber
+   *
+   * @return int|null
+   * @throws \CRM_Core_Exception
+   */
+  protected function getPendingStatusID(int $participantNumber): ?int {
+    if (!$this->isPaidEvent() || $this->getFeeAmountForParticipant($participantNumber) == 0) {
+      return NULL;
+    }
+    $isPayLater = $this->getIsPayLaterForParticipant($participantNumber);
+    if (!($isPayLater || $this->getPaymentProcessorObject()->supports('noReturn'))) {
+      return NULL;
+    }
+    return CRM_Core_PseudoConstant::getKey('CRM_Event_DAO_Participant', 'status_id', $isPayLater ? 'Pending from pay later' : 'Pending from incomplete transaction');
+  }
+
+  /**
+   * Is this participant's registration being processed as pay-later.
+   *
+   * @param int $participantNumber
+   *
+   * @return bool
+   */
+  protected function getIsPayLaterForParticipant(int $participantNumber): bool {
+    if ($this->_allowWaitlist || $this->_requireApproval) {
+      return FALSE;
+    }
+    if ($this->isShowPaymentOnConfirm()) {
+      return $this->isPayLater();
+    }
+    return (bool) ($this->_params[$participantNumber]['is_pay_later'] ?? FALSE);
+  }
+
+  /**
    * Get the role to register a participant with.
    *
    * @param int $participantNumber
@@ -1869,10 +1939,10 @@ class CRM_Event_Form_Registration extends CRM_Core_Form {
         //lets get the status if require approval or waiting.
 
         $waitingStatuses = CRM_Event_PseudoConstant::participantStatus(NULL, "class = 'Waiting'");
-        if ($this->_allowWaitlist && !$this->_allowConfirmation) {
+        if ($this->_allowWaitlist) {
           $value['participant_status_id'] = $value['participant_status'] = array_search('On waitlist', $waitingStatuses);
         }
-        elseif ($this->_requireApproval && !$this->_allowConfirmation) {
+        elseif ($this->_requireApproval) {
           $value['participant_status_id'] = $value['participant_status'] = array_search('Awaiting approval', $waitingStatuses);
         }
 
