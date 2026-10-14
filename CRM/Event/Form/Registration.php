@@ -864,6 +864,43 @@ class CRM_Event_Form_Registration extends CRM_Core_Form {
   }
 
   /**
+   * @param $participantNumber
+   * @param int $contactID
+   *
+   * @return array
+   * @throws \CRM_Core_Exception
+   */
+  protected function getSaveParametersForParticipant($participantNumber, int $contactID): array {
+    $participantParams = [
+      'id' => $this->getExistingParticipantID($participantNumber),
+      'contact_id' => $contactID,
+      'event_id' => $this->getEventID(),
+      'status_id' => $this->getParticipantStatusID($participantNumber),
+      'role_id' => $this->getRoleID($participantNumber),
+      'source' => $this->getSource($participantNumber),
+      'fee_level' => $this->getAmountLevelForParticipant($participantNumber),
+      'is_pay_later' => $this->getIsPayLaterForParticipant($participantNumber),
+      'fee_amount' => $this->getFeeAmountForParticipant($participantNumber),
+      'registered_by_id' => $this->getRegisteredByID($participantNumber),
+      'fee_currency' => $this->getCurrency(),
+      'campaign_id' => $this->getCampaignID($participantNumber),
+      'is_test' => $this->isTest(),
+      'discount_id' => $this->getDiscountID(),
+    ] + $this->getSubmittedCustomFields(4, 'Participant', $this->getSubmittedParticipantValues($participantNumber));
+    // On a fresh registration there is no existing participant row to preserve
+    // register_date from, and the field has no db-level default.
+    if (empty($participantParams['id'])) {
+      $participantParams['register_date'] = date('YmdHis');
+    }
+
+    $note = $this->getSubmittedParticipantValue('note', $participantNumber) ?: $this->getSubmittedParticipantValue('participant_note', $participantNumber);
+    if (!empty($note)) {
+      $participantParams['note'] = $note;
+    }
+    return $participantParams;
+  }
+
+  /**
    * This is a throw-away object to calculate values, to allow it to validate
    * input values during submission.
    *
@@ -911,7 +948,10 @@ class CRM_Event_Form_Registration extends CRM_Core_Form {
    */
   public function confirmPostProcess($contactID, $participantRecord, int $participantNum = 0): void {
     // add participant record
-    $participantID = $this->addParticipant($contactID, $participantNum);
+    $transaction = new CRM_Core_Transaction();
+    $participantParams = $this->getSaveParametersForParticipant($participantNum, $contactID);
+    $participantID = (int) Participant::save(FALSE)->addRecord($participantParams)->execute()->single()['id'];
+    $transaction->commit();
     $this->_participantIDS[$participantNum] = $participantID;
 
     //setting register_by_id field and primaryContactId
@@ -960,53 +1000,6 @@ class CRM_Event_Form_Registration extends CRM_Core_Form {
         CRM_Core_Error::statusBounce(ts('Your profile is not saved and Account is not created.'));
       }
     }
-  }
-
-  /**
-   * Process the participant.
-   *
-   * @param int $contactID
-   * @param $participantNumber
-   *
-   * @return int
-   * @throws \CRM_Core_Exception
-   */
-  private function addParticipant($contactID, $participantNumber): int {
-    $transaction = new CRM_Core_Transaction();
-
-    $participantParams = [
-      'id' => $this->getExistingParticipantID($participantNumber),
-      'contact_id' => $contactID,
-      'event_id' => $this->getEventID(),
-      'status_id' => $this->getParticipantStatusID($participantNumber),
-      'role_id' => $this->getRoleID($participantNumber),
-      'source' => $this->getSource($participantNumber),
-      'fee_level' => $this->getAmountLevelForParticipant($participantNumber),
-      'is_pay_later' => $this->getIsPayLaterForParticipant($participantNumber),
-      'fee_amount' => $this->getFeeAmountForParticipant($participantNumber),
-      'registered_by_id' => $this->getRegisteredByID($participantNumber),
-      'fee_currency' => $this->getCurrency(),
-      'campaign_id' => $this->getCampaignID($participantNumber),
-      'is_test' => $this->isTest(),
-    ] + $this->getSubmittedCustomFields(4, 'Participant', $this->getSubmittedParticipantValues($participantNumber));
-    // On a fresh registration there is no existing participant row to preserve
-    // register_date from, and the field has no db-level default.
-    if (empty($participantParams['id'])) {
-      $participantParams['register_date'] = date('YmdHis');
-    }
-
-    $note = $this->getSubmittedParticipantValue('note', $participantNumber) ?: $this->getSubmittedParticipantValue('participant_note', $participantNumber);
-    if (!empty($note)) {
-      $participantParams['note'] = $note;
-    }
-
-    $participantParams['discount_id'] = $this->getDiscountID();
-
-    $participantID = (int) Participant::save(FALSE)->addRecord($participantParams)->execute()->single()['id'];
-
-    $transaction->commit();
-
-    return $participantID;
   }
 
   /**
