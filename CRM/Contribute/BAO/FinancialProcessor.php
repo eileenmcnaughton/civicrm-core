@@ -401,11 +401,13 @@ class CRM_Contribute_BAO_FinancialProcessor {
           // Set amounts to create a reversal transaction.
           $params['trxnParams']['total_amount'] = $params['trxnParams']['net_amount'] = -$this->getOriginalContribution()->total_amount;
           $params['trxnParams']['fee_amount'] = 0 - $this->getOriginalContribution()->fee_amount;
-          $this->updateFinancialAccounts($params['trxnParams'], 'changeFinancialType');
+          $trxnID = $this->createFinancialTrxn($params['trxnParams']);
+          $this->updateFinancialAccounts($trxnID, 'changeFinancialType');
           // Set the amounts back to the original value for creating the new positive financial trxn.
           $params['total_amount'] = $params['trxnParams']['net_amount'] = $params['trxnParams']['total_amount'] = $this->getUpdatedContribution()->total_amount;
           $params['trxnParams']['fee_amount'] = $this->getUpdatedContribution()->fee_amount;
-          $this->updateFinancialAccounts($params['trxnParams'], NULL, $this->getUpdatedFinancialAccount());
+          $trxnID = $this->createFinancialTrxn($params['trxnParams']);
+          $this->updateFinancialAccounts($trxnID, NULL, $this->getUpdatedFinancialAccount());
           $params['trxnParams']['to_financial_account_id'] = $trxnParams['to_financial_account_id'];
           $updated = TRUE;
           $params['deferred_financial_account_id'] = $this->getUpdatedFinancialAccount();
@@ -449,7 +451,8 @@ class CRM_Contribute_BAO_FinancialProcessor {
           //Update Financial Records
           $params['trxnParams']['from_financial_account_id'] = NULL;
           $params['trxnParams']['total_amount'] = $params['trxnParams']['net_amount'] = ($params['total_amount'] - $this->getOriginalContribution()->total_amount);
-          $this->updateFinancialAccounts($params['trxnParams'], 'changedAmount');
+          $trxnID = $this->createFinancialTrxn($params['trxnParams']);
+          $this->updateFinancialAccounts($trxnID, 'changedAmount');
           $updated = TRUE;
         }
 
@@ -473,6 +476,12 @@ class CRM_Contribute_BAO_FinancialProcessor {
           $panTruncation = $params['pan_truncation'] ?? NULL;
           CRM_Core_BAO_FinancialTrxn::updateCreditCardDetails($this->getUpdatedContribution()->id, $panTruncation, $cardType);
         }
+        // This handling for skip line item is from previously shared code but hard to see that it makes sense here.
+        if (empty($params['skipLineItem'])) {
+          foreach ($this->getUpdatedLineItems() as $line) {
+            $this->createLineItem($line, $financialTrxnID ?? NULL);
+          }
+        }
       }
 
       else {
@@ -485,10 +494,13 @@ class CRM_Contribute_BAO_FinancialProcessor {
         $financialTxnID = $this->createFinancialTrxn($trxnParams);
         $params['entity_id'] = $financialTxnID;
       }
-    }
-    // record line items and financial items
-    if (empty($params['skipLineItem'])) {
-      $this->createLineItems($financialTxnID ?? NULL);
+      // record line items and financial items
+      if (empty($params['skipLineItem'])) {
+        foreach ($this->getUpdatedLineItems() as $line) {
+          $this->createLineItem($line, $financialTrxnID ?? NULL);
+        }
+        $this->createDeferredTrxn();
+      }
     }
 
     // create batch entry if batch_id is passed and
@@ -669,16 +681,14 @@ class CRM_Contribute_BAO_FinancialProcessor {
   /**
    * Update all financial accounts entry.
    *
-   * @param array $trxnParams
-   *   Params for the trxn to record.
+   * @param int $trxnID
    * @param string $context
    *   Update scenarios.
    * @param int|null $financialAccount
    *   Financial account to use for every line, overriding the per-line default - only
    *   passed for the second pass of a changeFinancialType update.
    */
-  private function updateFinancialAccounts($trxnParams, $context = NULL, ?int $financialAccount = NULL): void {
-    $trxnID = $this->createFinancialTrxn($trxnParams);
+  private function updateFinancialAccounts(int $trxnID, $context = NULL, ?int $financialAccount = NULL): void {
     $lineItems = $this->getUpdatedLineItems();
     $postUpdateContribution = $this->getUpdatedContribution();
     foreach ($lineItems as $lineItemDetails) {
@@ -875,7 +885,8 @@ class CRM_Contribute_BAO_FinancialProcessor {
       }
       return;
     }
-    $this->updateFinancialAccounts($params['trxnParams'], 'changedStatus');
+    $trxnID = $this->createFinancialTrxn($params['trxnParams']);
+    $this->updateFinancialAccounts($trxnID, 'changedStatus');
   }
 
   /**
