@@ -1536,9 +1536,12 @@ WHERE  id = $cfID
    *   array of Additional participant's info OR array of Ids.
    * @throws \CRM_Core_Exception
    * @throws \Civi\Core\Exception\DBQueryException
+   *
+   * @deprecated since 6.21 will be removed around 6.30
    */
   public static function buildCustomProfile($participantId, $values) {
 
+    CRM_Core_Error::deprecatedFunctionWarning(NULL);
     $customProfile = $additionalIDs = [];
     if (!$participantId) {
       throw new CRM_Core_Exception(ts('Cannot find participant ID'));

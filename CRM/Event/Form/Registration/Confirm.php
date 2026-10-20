@@ -659,7 +659,7 @@ class CRM_Event_Form_Registration_Confirm extends CRM_Event_Form_Registration {
       // patterns and practices.
 
       //build an array of custom profile and assigning it to template
-      $customProfile = CRM_Event_BAO_Event::buildCustomProfile($registerByID, $this->_values);
+      $customProfile = $this->buildCustomProfile($registerByID, $this->_values);
       if (count($customProfile)) {
         // @todo - calculate this on the thank you page, where it is used rather than here & passing through.
         $this->set('customProfile', $customProfile);
@@ -718,7 +718,7 @@ class CRM_Event_Form_Registration_Confirm extends CRM_Event_Form_Registration {
         $this->_values['params'][$participantID] = $this->getSubmittedParticipantValues($participantNum);
       }
 
-      $customProfile = CRM_Event_BAO_Event::buildCustomProfile($this->getParticipantID(), $this->_values);
+      $customProfile = $this->buildCustomProfile($this->getParticipantID(), $this->_values);
 
       if (count($customProfile)) {
         // @todo - calculate this on the thank you page, where it is used rather than here & passing through.
@@ -738,6 +738,111 @@ class CRM_Event_Form_Registration_Confirm extends CRM_Event_Form_Registration {
         }
       }
     }
+  }
+
+  /**
+   * Build the array for Additional participant's information  array of primary and additional Ids.
+   *
+   * @param int $participantId
+   *   Id of Primary participant.
+   * @param array $values
+   *   Key/value event info.
+   *
+   * @return array
+   *   array of Additional participant's info OR array of Ids.
+   * @throws \CRM_Core_Exception
+   * @throws \Civi\Core\Exception\DBQueryException
+   */
+  private function buildCustomProfile($participantId, $values) {
+
+    $customProfile = $additionalIDs = [];
+    if (!$participantId) {
+      throw new CRM_Core_Exception(ts('Cannot find participant ID'));
+    }
+
+    //hack to skip cancelled participants, CRM-4320
+    $where = "participant.registered_by_id={$participantId}";
+    $negativeStatuses = CRM_Event_PseudoConstant::participantStatus(NULL, "class = 'Negative'");
+    $cancelStatusId = array_search('Cancelled', $negativeStatuses);
+    $where .= " AND participant.status_id != {$cancelStatusId}";
+    $query = "
+  SELECT  participant.id, participant.contact_id
+    FROM  civicrm_participant participant
+   WHERE  {$where}";
+
+    $dao = CRM_Core_DAO::executeQuery($query);
+    while ($dao->fetch()) {
+      $additionalIDs[$dao->id] = $dao->contact_id;
+    }
+
+    $preProfileID = $values['additional_custom_pre_id'] ?? NULL;
+    $postProfileID = $values['additional_custom_post_id'] ?? NULL;
+    //else build array of Additional participant's information.
+    if (count($additionalIDs)) {
+      if ($preProfileID || $postProfileID) {
+        $template = CRM_Core_Smarty::singleton();
+
+        $isCustomProfile = TRUE;
+        $i = 1;
+        $title = $groupTitles = [];
+        foreach ($additionalIDs as $pId => $cId) {
+          //get the params submitted by participant.
+          $participantParams = NULL;
+          if (isset($values['params'])) {
+            $participantParams = $values['params'][$pId] ?? [];
+          }
+
+          [$profilePre, $groupTitles] = CRM_Event_BAO_Event::buildCustomDisplay($preProfileID,
+            'additionalCustomPre',
+            $cId,
+            $template,
+            $pId,
+            FALSE,
+            $isCustomProfile,
+            $participantParams
+          );
+
+          if ($profilePre) {
+            $profile = $profilePre;
+            // $customProfile[$i] = array_merge( $groupTitles, $customProfile[$i] );
+            if ($i === 1) {
+              $title = $groupTitles;
+            }
+          }
+
+          [$profilePost, $groupTitles] = CRM_Event_BAO_Event::buildCustomDisplay($postProfileID,
+            'additionalCustomPost',
+            $cId,
+            $template,
+            $pId,
+            FALSE,
+            $isCustomProfile,
+            $participantParams
+          );
+
+          if ($profilePost) {
+            if (isset($profilePre)) {
+              $profile = array_merge($profilePre, $profilePost);
+              if ($i === 1) {
+                $title = array_merge($title, $groupTitles);
+              }
+            }
+            else {
+              $profile = $profilePost;
+              if ($i === 1) {
+                $title = $groupTitles;
+              }
+            }
+          }
+          $profiles[] = $profile;
+          $i++;
+        }
+        $customProfile['title'] = $title;
+        $customProfile['profile'] = $profiles;
+      }
+    }
+
+    return $customProfile;
   }
 
   /**
