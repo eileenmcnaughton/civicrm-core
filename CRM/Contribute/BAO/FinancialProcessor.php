@@ -348,8 +348,15 @@ class CRM_Contribute_BAO_FinancialProcessor {
    * @return bool
    */
   private function isSupportedContributionStatusChange(): bool {
-    if ($this->getOriginalContributionStatus() === 'Partially paid' && $this->isCompletedTransaction()) {
-      CRM_Core_Error::deprecatedWarning('updating partially paid to completed without going through the payment api is deprecated and will create incorrect financial records');
+    if ($this->getOriginalContributionStatus() === 'Partially paid'
+      && ($this->isCompletedTransaction() || $this->getUpdatedContributionStatus() === 'Refunded')
+    ) {
+      CRM_Core_Error::deprecatedWarning('updating partially paid to completed or refunded without going through the payment api is deprecated and will create incorrect financial records');
+      return FALSE;
+    }
+    // Refunded -> Cancelled has no defined correct behaviour to point callers towards,
+    // but the current fallthrough posts an incorrect transaction, so decline quietly.
+    if ($this->getOriginalContributionStatus() === 'Refunded' && $this->getUpdatedContributionStatus() === 'Cancelled') {
       return FALSE;
     }
     return TRUE;
