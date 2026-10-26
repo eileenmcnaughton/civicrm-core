@@ -101,6 +101,7 @@ class CRM_Contribute_BAO_FinancialProcessor {
    * @throws \CRM_Core_Exception
    */
   public function updateFinancialRecordsOnContributionUpdate(array $params): array {
+    $this->logUnsupportedStatusChange();
     if ($this->isUnpaidAndNotPayLater()) {
       $this->saveLineItemsWithNoFinancialTransaction();
       return $params;
@@ -346,6 +347,25 @@ class CRM_Contribute_BAO_FinancialProcessor {
 
   private function isOriginalStatusPending(): bool {
     return in_array($this->getOriginalContributionStatus(), ['Pending', 'In Progress'], TRUE);
+  }
+
+  /**
+   * Log a deprecation notice for direct status changes that bypass the payment api.
+   *
+   * Partially paid -> Completed or Refunded is expected to reach here only via
+   * Payment.create (which bypasses FinancialProcessor entirely via
+   * is_post_payment_create before this is ever called) - a direct
+   * Contribution.create call that skips that is unsupported and would
+   * create incorrect financial records. The change is declined regardless
+   * (neither case matches isReversalTransactionRequired() or
+   * isBeingUpdatedToNonCoreStatus()) - this only adds the warning.
+   */
+  private function logUnsupportedStatusChange(): void {
+    if ($this->getOriginalContributionStatus() === 'Partially paid'
+      && ($this->isCompletedTransaction() || $this->getUpdatedContributionStatus() === 'Refunded')
+    ) {
+      CRM_Core_Error::deprecatedWarning('updating partially paid to completed or refunded without going through the payment api is deprecated and will create incorrect financial records');
+    }
   }
 
   /**
