@@ -878,6 +878,25 @@ class CRM_Contribute_BAO_FinancialProcessor {
   }
 
   /**
+   * Should the full original amount be reversed (posted as a negative) for this status change.
+   *
+   * This covers both ways a reversal of the full amount already posted can be triggered:
+   * - a Completed contribution moving to a negative status (a refund, cancellation or chargeback).
+   * - a Pending (pay later) or In Progress contribution being Cancelled, reversing the
+   *   outstanding amount that was booked to accounts receivable rather than ever paid.
+   *
+   * @return bool
+   */
+  private function isReversalTransactionRequired(): bool {
+    if ($this->isContributionUpdateARefund()) {
+      return TRUE;
+    }
+    return (($this->getOriginalContributionStatus() === 'Pending' && $this->getOriginalContribution()->is_pay_later)
+        || $this->getOriginalContributionStatus() === 'In Progress')
+      && $this->getUpdatedContributionStatus() === 'Cancelled';
+  }
+
+  /**
    * Is the financial account changed on the contribution.
    *
    * @todo - this should only matter at the line item level.
@@ -915,24 +934,21 @@ class CRM_Contribute_BAO_FinancialProcessor {
    */
   private function updateFinancialAccountsOnContributionStatusChange(&$params): void {
     $previousContributionStatus = $this->getOriginalContributionStatus();
-    $currentContributionStatus = $this->getUpdatedContributionStatus();
 
-    if ($this->isContributionUpdateARefund()) {
+    if ($this->isReversalTransactionRequired()) {
       // @todo we should stop passing $params by reference - splitting this out would be a step towards that.
       $params['trxnParams']['total_amount'] = -$params['total_amount'];
+      if ($previousContributionStatus !== 'Completed') {
+        // The outstanding amount was booked to accounts receivable rather than ever paid, so
+        // the reversal is posted back to accounts receivable rather than the asset account.
+        $params['trxnParams']['to_financial_account_id'] = $this->getUpdatedAccountsReceivableAccount();
+      }
     }
     elseif (($previousContributionStatus === 'Pending'
         && $this->getOriginalContribution()->is_pay_later) || $previousContributionStatus === 'In Progress'
     ) {
-      if ($currentContributionStatus === 'Cancelled') {
-        // @todo we should stop passing $params by reference - splitting this out would be a step towards that.
-        $params['trxnParams']['to_financial_account_id'] = $this->getUpdatedAccountsReceivableAccount();
-        $params['trxnParams']['total_amount'] = -$params['total_amount'];
-      }
-      else {
-        // @todo we should stop passing $params by reference - splitting this out would be a step towards that.
-        $params['trxnParams']['from_financial_account_id'] = $this->getUpdatedAccountsReceivableAccount();
-      }
+      // @todo we should stop passing $params by reference - splitting this out would be a step towards that.
+      $params['trxnParams']['from_financial_account_id'] = $this->getUpdatedAccountsReceivableAccount();
     }
     $this->updateFinancialAccounts($params['trxnParams'], 'changedStatus');
   }
