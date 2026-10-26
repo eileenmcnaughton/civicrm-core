@@ -156,12 +156,24 @@ class CRM_Contribute_BAO_FinancialProcessor {
     if ($this->isOriginalStatusPending() && $this->isCompletedTransaction()) {
       $params = $this->addPayment($params);
     }
-    elseif ($this->isSupportedContributionStatusChange()
-      && !empty($params['contribution_status_id'])
-      && $this->getOriginalContribution()->contribution_status_id != $this->getUpdatedContribution()->contribution_status_id
-    ) {
-      //Update Financial Records
-      $this->updateFinancialAccountsOnContributionStatusChange($params);
+    if ($this->isReversalTransactionRequired()) {
+      // @todo we should stop passing $params by reference - splitting this out would be a step towards that.
+      $params['trxnParams']['total_amount'] = -$params['total_amount'];
+      if ($this->getOriginalContributionStatus() !== 'Completed') {
+        // The outstanding amount was booked to accounts receivable rather than ever paid, so
+        // the reversal is posted back to accounts receivable rather than the asset account.
+        $params['trxnParams']['to_financial_account_id'] = $this->getUpdatedAccountsReceivableAccount();
+      }
+      $this->updateFinancialAccounts($params['trxnParams'], 'changedStatus');
+    }
+    if ($this->isBeingUpdatedToNonCoreStatus()) {
+      if (($this->getOriginalContributionStatus() === 'Pending' && $this->getOriginalContribution()->is_pay_later)
+        || $this->getOriginalContributionStatus() === 'In Progress'
+      ) {
+        // @todo we should stop passing $params by reference - splitting this out would be a step towards that.
+        $params['trxnParams']['from_financial_account_id'] = $this->getUpdatedAccountsReceivableAccount();
+      }
+      $this->updateFinancialAccounts($params['trxnParams'], 'changedStatus');
     }
     $trxnParams = $params['trxnParams'];
     unset($params['trxnParams']);
@@ -337,29 +349,21 @@ class CRM_Contribute_BAO_FinancialProcessor {
   }
 
   /**
-   * Is this a status change FinancialProcessor should actually act on.
+   * Is this contribution being updated to a site-defined (non-core) status.
    *
-   * Partially paid -> Completed is expected to reach here only via
-   * Payment.create (which bypasses FinancialProcessor entirely via
-   * is_post_payment_create before this is ever called) - a direct
-   * Contribution.create call that skips that is unsupported and would
-   * create incorrect financial records, so warn and decline to act.
+   * Core statuses are handled explicitly elsewhere (as a reversal, or via
+   * addPayment()); a custom status is defined by the site, so we have no
+   * basis to decide what should happen and keep the status quo of posting
+   * a positive transaction for the full amount.
    *
    * @return bool
    */
-  private function isSupportedContributionStatusChange(): bool {
-    if ($this->getOriginalContributionStatus() === 'Partially paid'
-      && ($this->isCompletedTransaction() || $this->getUpdatedContributionStatus() === 'Refunded')
-    ) {
-      CRM_Core_Error::deprecatedWarning('updating partially paid to completed or refunded without going through the payment api is deprecated and will create incorrect financial records');
+  private function isBeingUpdatedToNonCoreStatus(): bool {
+    if (!$this->isStatusChange()) {
       return FALSE;
     }
-    // Refunded -> Cancelled has no defined correct behaviour to point callers towards,
-    // but the current fallthrough posts an incorrect transaction, so decline quietly.
-    if ($this->getOriginalContributionStatus() === 'Refunded' && $this->getUpdatedContributionStatus() === 'Cancelled') {
-      return FALSE;
-    }
-    return TRUE;
+    $contributionStatuses = array_column(\Civi::entity('Contribution')->getOptions('contribution_status_id'), NULL, 'id');
+    return empty($contributionStatuses[$this->updatedContribution->contribution_status_id]['is_reserved']);
   }
 
   /**
@@ -916,47 +920,9 @@ class CRM_Contribute_BAO_FinancialProcessor {
   }
 
   /**
-   * Do any accounting updates required as a result of a contribution status change.
-   *
-   * Currently we have a bit of a roundabout where adding a payment results in this being called &
-   * this may attempt to add a payment. We need to resolve that....
-   *
-   * The 'right' way to add payments or refunds is through the Payment.create api. That api
-   * then updates the contribution but this process should not also record another financial trxn.
-   * Currently we have weak detection fot that scenario & where it is detected the first returned
-   * value is FALSE - meaning 'do not continue'.
-   *
-   * We should also look at the fact that the calling function - updateFinancialAccounts
-   * bunches together some disparate processes rather than having separate appropriate
-   * functions.
-   *
-   * @param array $params
-   */
-  private function updateFinancialAccountsOnContributionStatusChange(&$params): void {
-    $previousContributionStatus = $this->getOriginalContributionStatus();
-
-    if ($this->isReversalTransactionRequired()) {
-      // @todo we should stop passing $params by reference - splitting this out would be a step towards that.
-      $params['trxnParams']['total_amount'] = -$params['total_amount'];
-      if ($previousContributionStatus !== 'Completed') {
-        // The outstanding amount was booked to accounts receivable rather than ever paid, so
-        // the reversal is posted back to accounts receivable rather than the asset account.
-        $params['trxnParams']['to_financial_account_id'] = $this->getUpdatedAccountsReceivableAccount();
-      }
-    }
-    elseif (($previousContributionStatus === 'Pending'
-        && $this->getOriginalContribution()->is_pay_later) || $previousContributionStatus === 'In Progress'
-    ) {
-      // @todo we should stop passing $params by reference - splitting this out would be a step towards that.
-      $params['trxnParams']['from_financial_account_id'] = $this->getUpdatedAccountsReceivableAccount();
-    }
-    $this->updateFinancialAccounts($params['trxnParams'], 'changedStatus');
-  }
-
-  /**
    * Record payment completing a Pending/In Progress contribution - called
-   * directly instead of routing through updateFinancialAccountsOnContributionStatusChange(),
-   * since this is a fresh payment at the contribution's current amount, not
+   * directly rather than via the reversal/non-core-status dispatch, since
+   * this is a fresh payment at the contribution's current amount, not
    * an adjustment relative to whatever was previously pending.
    *
    * @param array $params
