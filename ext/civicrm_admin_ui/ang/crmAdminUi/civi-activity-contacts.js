@@ -1,8 +1,34 @@
 (function (CRM) {
+  const ts = CRM.ts('civicrm_admin_ui');
+
+  // Above this many contacts only the count is shown, so bulk mailings never have their recipients fetched
+  const MAX_LISTED_CONTACTS = 10;
+
+  // Every element connected in the same tick joins one batch, fetched with a single api call
+  let openBatch = null;
+
+  const fetchActivityContacts = (activityId) => {
+    if (!openBatch) {
+      const batch = {activityIds: new Set()};
+      batch.records = new Promise((resolve) => setTimeout(resolve)).then(() => {
+        openBatch = null;
+        return CRM.api4('ActivityContact', 'get', {
+          select: ['activity_id', 'record_type_id:name', 'contact_id', 'contact_id.display_name'],
+          where: [
+            ['activity_id', 'IN', [...batch.activityIds]],
+            ['record_type_id:name', 'IN', ['Activity Targets', 'Activity Assignees']],
+          ],
+          orderBy: {'contact_id.sort_name': 'ASC'},
+        });
+      });
+      openBatch = batch;
+    }
+    openBatch.activityIds.add(activityId);
+    return openBatch.records.then((records) => records.filter((record) => record.activity_id === activityId));
+  };
 
   /**
-   * <civi-activity-contacts activity-id="1234" type="Source Contact" loading-placeholders="3">
-   *
+   * <civi-activity-contacts activity-id="1234" type="Activity Targets" contact-count="3">
    */
   class CiviActivityContacts extends HTMLElement {
 
@@ -14,66 +40,45 @@
       this.fetchAndRender();
     }
 
-    /**
-     * Rerender when activity-id is updated
-     *
-     * @param  {String} name     The attribute name
-     */
-    attributeChangedCallback (name) {
-      if (name === 'activity-id' && this.activityId) {
+    attributeChangedCallback(name) {
+      if (name === 'activity-id' && this.isConnected && this.activityId) {
         this.fetchAndRender();
       }
     }
 
     get activityId() {
-      const val = parseInt(this.getAttribute('activity-id'));
-      return val ? val : null;
+      return parseInt(this.getAttribute('activity-id')) || null;
     }
 
     get type() {
       return this.getAttribute('type');
     }
 
-    get loadingPlaceholders() {
-      const val = parseInt(this.getAttribute('loading-placeholders'));
-      return val ? val : null;
+    get contactCount() {
+      return parseInt(this.getAttribute('contact-count')) || 0;
     }
 
     async fetchAndRender() {
+      if (this.contactCount > MAX_LISTED_CONTACTS) {
+        this.innerText = ts('%1 contacts', {1: this.contactCount});
+        return;
+      }
       this.renderLoading();
       if (!this.activityId) {
         return;
       }
-      const contacts = await this.fetchData();
-      this.render(contacts);
-    }
-
-    async fetchData() {
-      const records = await CRM.api4('ActivityContact', 'get', {
-        where: [
-          ['activity_id', '=', this.activityId],
-          ['record_type_id:name', '=', this.type],
-        ],
-        select: [
-          'contact_id',
-          'contact_id.display_name'
-        ],
-        orderBy: {
-          'contact_id.sort_name': 'ASC'
-        },
-        // limit is 11 - display up to 10 and show ... if 11th exists
-        limit: 11
-      });
-
-      return records.map((record) => ({
-        id: record.contact_id,
-        display_name: record['contact_id.display_name']
-      }));
+      const records = await fetchActivityContacts(this.activityId);
+      this.render(records
+        // Contacts the user cannot see come back without a name; leave them out
+        .filter((record) => record['record_type_id:name'] === this.type && record['contact_id.display_name'])
+        .map((record) => ({id: record.contact_id, display_name: record['contact_id.display_name']}))
+      );
     }
 
     renderLoading() {
-      const placeholder = '<li><span class="crm-search-loading-placeholder" /></li>';
-      this.innerHTML = `<ul>${placeholder.repeat(this.loadingPlaceholders)}</ul>`;
+      // One placeholder per contact so the row is already at its final height
+      const placeholder = '<li><span class="crm-search-loading-placeholder"></span></li>';
+      this.innerHTML = `<ul>${placeholder.repeat(this.contactCount || 1)}</ul>`;
     }
 
     render(contacts) {
@@ -81,30 +86,20 @@
         this.innerText = ts('(none)');
         return;
       }
-
-      this.innerHTML = `<ul></ul>`;
-
-      this.querySelector('ul').append(...contacts.map((record, i) => {
-        if (i === 10) {
-          // if there are more than 10 contacts, show ... as the last item
-          const li = document.createElement('li');
-          li.innerText = '...';
-          return li;
-        }
-
+      const list = document.createElement('ul');
+      list.append(...contacts.map((contact) => {
         const anchor = document.createElement('a');
-        anchor.href = CRM.url(`civicrm/contact/view?reset=1&cid=${record.id}`);
+        anchor.href = CRM.url('civicrm/contact/view', {reset: 1, cid: contact.id});
         anchor.target = '_blank';
-        anchor.innerText = record.display_name;
-
-        const li = document.createElement('li');
-        li.append(anchor);
-        return li;
+        anchor.innerText = contact.display_name;
+        const item = document.createElement('li');
+        item.append(anchor);
+        return item;
       }));
+      this.replaceChildren(list);
     }
   }
 
-  // register custom element in our civi namespace
   customElements.define('civi-activity-contacts', CiviActivityContacts);
 
 })(CRM);

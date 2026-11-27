@@ -1,4 +1,3 @@
-(function(angular, $, _) {
-  // Declare a list of dependencies.
+(function(angular) {
   angular.module('crmAdminUi', CRM.angRequires('crmAdminUi'));
-})(angular, CRM.$, CRM._);
+})(angular);

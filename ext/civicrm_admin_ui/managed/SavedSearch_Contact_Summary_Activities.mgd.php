@@ -33,7 +33,7 @@ return [
           'join' => [
             [
               'Contact AS Activity_ActivityContact_Contact_01',
-              'INNER',
+              'LEFT',
               'ActivityContact',
               [
                 'id',
